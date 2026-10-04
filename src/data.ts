@@ -93,3 +93,13 @@ export async function signedMemberPhoto(path:string){return unwrap(await require
 export function money(value:number,currency='INR'){return new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(value||0))}
 export function date(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value+'T00:00:00')):'—'}
 export function dateTime(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—'}
+
+export async function inviteStaff(args:{gymId:string;email:string;name:string;phone?:string;role:'coach'|'staff';redirectTo:string}){
+ const {data,error}=await requireClient().functions.invoke('invite-staff',{body:args});
+ if(error)throw error;if(data?.error)throw new Error(data.error);return data;
+}
+export async function sendWhatsapp(notificationId:string){
+ const {data,error}=await requireClient().functions.invoke('send-whatsapp',{body:{notification_id:notificationId}});
+ if(error)throw error;if(data?.error)throw new Error(data.error);return data;
+}
+export async function syncStatuses(){return unwrap(await requireClient().rpc('sync_membership_statuses')) as unknown}
