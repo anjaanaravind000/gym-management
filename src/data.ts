@@ -107,3 +107,6 @@ export async function syncStatuses(){return unwrap(await requireClient().rpc('sy
 export async function loadCoachPerformance(gymId:string){
   return unwrap(await requireClient().from('coach_performance_report').select('*').eq('gym_id',gymId).order('revenue_recorded',{ascending:false})) as any[];
 }
+
+export async function unfreezeMembership(gymId:string,membershipId:string){return unwrap(await requireClient().rpc('unfreeze_membership',{p_gym_id:gymId,p_membership_id:membershipId})) as unknown}
+export async function reversePayment(gymId:string,paymentId:string,reason:string,notes?:string){return unwrap(await requireClient().rpc('reverse_payment',{p_gym_id:gymId,p_payment_id:paymentId,p_reason:reason,p_notes:notes??null})) as unknown}
