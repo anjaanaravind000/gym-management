@@ -38,3 +38,16 @@ npm run build
 ## Product direction
 
 The app follows the agreed design standard: modern premium fitness SaaS, dark-first, large readable metrics, one-handed mobile workflows, bottom sheets for contextual actions, predictable navigation, and minimal decorative UI.
+
+
+## Live Supabase connection
+
+The app now uses the existing Supabase project for authentication and live data. Configure `.env.local` from `.env.example`. The frontend uses only the publishable key; RLS remains responsible for tenant isolation.
+
+On first sign-in, the app opens a gym setup flow that creates the gym/admin tenant through the protected `bootstrap_gym` RPC. No demo members, payments, or attendance records are seeded.
+
+Live screens currently backed by Supabase:
+- Dashboard metrics: revenue, active/expiring members, outstanding balance, today's attendance, recent payments
+- Members: search and membership-status filtering
+- Payments: real payment records
+- Attendance: real check-in records
