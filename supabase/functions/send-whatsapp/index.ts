@@ -1,0 +1,22 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
+const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:cors});
+Deno.serve(async(req)=>{if(req.method==="OPTIONS")return new Response("ok",{headers:cors});try{
+const token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"");if(!token)return json({error:"Authentication required"},401);
+const pk=JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")??"{}"),sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}"),url=Deno.env.get("SUPABASE_URL"),pub=pk.default,secret=sk.default;
+if(!url||!pub||!secret)return json({error:"Function configuration is incomplete"},500);
+const auth=createClient(url,pub),ad=createClient(url,secret),au=await auth.auth.getUser(token);if(au.error||!au.data.user)return json({error:"Invalid session"},401);
+const{notification_id}=await req.json();if(!notification_id)return json({error:"notification_id is required"},400);
+const{data:n,error:ne}=await ad.from("notifications").select("*,members(name,member_id,phone),gyms(name,phone,whatsapp)").eq("id",notification_id).maybeSingle();if(ne||!n)return json({error:"Notification not found"},404);
+const{data:u}=await ad.from("users").select("id,gym_id,role,status").eq("id",au.data.user.id).eq("gym_id",n.gym_id).maybeSingle();if(!u||u.status!=="active")return json({error:"Unauthorized"},403);
+const{data:perm}=await ad.from("user_permissions").select("allowed").eq("user_id",u.id).eq("permission","whatsapp.manage").maybeSingle();if(u.role!=="admin"&&!perm?.allowed)return json({error:"Unauthorized"},403);
+if(n.status==="sent"||n.delivery_status==="delivered")return json({ok:true,already_sent:true});
+const phone=n.members?.phone;if(!phone)return json({error:"Member has no WhatsApp/mobile number"},400);
+const access=Deno.env.get("WHATSAPP_ACCESS_TOKEN"),numberId=Deno.env.get("WHATSAPP_PHONE_NUMBER_ID"),version=Deno.env.get("WHATSAPP_API_VERSION");if(!access||!numberId||!version)return json({error:"WhatsApp is not configured. Add WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_API_VERSION."},503);
+const resp=await fetch("https://graph.facebook.com/"+version+"/"+numberId+"/messages",{method:"POST",headers:{Authorization:"Bearer "+access,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone.replace(/\D/g,""),type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}})});
+const result=await resp.json(),providerId=result?.messages?.[0]?.id??null;
+await ad.from("notification_logs").insert({notification_id:n.id,status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",provider_message_id:providerId,error_message:resp.ok?null:JSON.stringify(result)});
+await ad.from("notifications").update({status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",sent_at:resp.ok?new Date().toISOString():null,error_message:resp.ok?null:JSON.stringify(result),retry_count:resp.ok?n.retry_count:(n.retry_count??0)+1}).eq("id",n.id);
+if(!resp.ok)return json({error:"WhatsApp provider rejected the message",provider:result},502);
+return json({ok:true,provider_message_id:providerId});
+}catch(e){return json({error:e instanceof Error?e.message:"Unexpected error"},500)}});
