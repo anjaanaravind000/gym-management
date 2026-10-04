@@ -40,6 +40,40 @@ export type Template = {
 };
 
 function requireClient(){if(!supabase)throw new Error('Supabase is not configured.');return supabase}
+export type AppSession={
+  user_id:string;
+  username:string;
+  display_name:string;
+  role:string;
+  gym_id:string|null;
+  expires_at:string;
+  session_token?:string;
+};
+
+export async function loginWithPassword(username:string,password:string):Promise<AppSession>{
+  const client=requireClient();
+  const {data,error}=await client.rpc('login_with_password',{p_username:username,p_password:password});
+  if(error)throw error;
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row?.session_token)throw new Error('Invalid username or password');
+  const {setAppSession}=await import('./supabase');
+  setAppSession(row.session_token);
+  return row as AppSession;
+}
+
+export async function getCurrentAppSession():Promise<AppSession|null>{
+  const client=requireClient();
+  const {data,error}=await client.rpc('get_current_app_session');
+  if(error)throw error;
+  const row=Array.isArray(data)?data[0]:data;
+  return row?(row as AppSession):null;
+}
+
+export async function logoutAppSession(){
+  try{await requireClient().rpc('logout_app')}
+  finally{const {setAppSession}=await import('./supabase');setAppSession(null)}
+}
+
 function unwrap<T>(r:{data:T|null,error:any}):T{if(r.error)throw r.error;return r.data as T}
 
 export async function loadProfile(userId:string){return unwrap(await requireClient().from('users').select('id,gym_id,name,email,phone,role,status').eq('id',userId).maybeSingle()) as UserProfile|null}
