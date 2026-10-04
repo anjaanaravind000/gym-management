@@ -103,3 +103,7 @@ export async function sendWhatsapp(notificationId:string){
  if(error)throw error;if(data?.error)throw new Error(data.error);return data;
 }
 export async function syncStatuses(){return unwrap(await requireClient().rpc('sync_membership_statuses')) as unknown}
+
+export async function loadCoachPerformance(gymId:string){
+  return unwrap(await requireClient().from('coach_performance_report').select('*').eq('gym_id',gymId).order('revenue_recorded',{ascending:false})) as any[];
+}
