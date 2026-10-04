@@ -51,3 +51,20 @@ Live screens currently backed by Supabase:
 - Members: search and membership-status filtering
 - Payments: real payment records
 - Attendance: real check-in records
+
+
+## External automation configuration
+
+WhatsApp sending is server-side. Configure these Supabase Edge Function secrets when you connect the official WhatsApp Business/Cloud API:
+
+- WHATSAPP_ACCESS_TOKEN
+- WHATSAPP_PHONE_NUMBER_ID
+- WHATSAPP_API_VERSION
+- WHATSAPP_WEBHOOK_VERIFY_TOKEN
+- WHATSAPP_WORKER_SECRET
+
+The app queues reminders through the database scheduler. The whatsapp-worker processes queued/failed messages (up to three attempts), and whatsapp-webhook records provider delivery/read status.
+
+Staff invitation uses the invite-staff Edge Function and requires Supabase Auth email delivery to be configured.
+
+The product does not seed fake business data. A newly created account must complete gym setup, then real members, memberships, payments and attendance populate the dashboards.
