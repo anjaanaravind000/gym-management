@@ -10,7 +10,7 @@ import{Members,MemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
 import{Notifications,Settings,Staff}from'./screens/admin';
-import{Sheet}from'./components/ui';
+import{Sheet}from'./components/ui';import{CancelForm,FreezeForm,MessageForm,RenewForm}from'./components/lifecycle';
 
 export type Screen='dashboard'|'members'|'memberships'|'payments'|'attendance'|'analytics'|'reports'|'notifications'|'settings'|'staff';
 const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
@@ -34,7 +34,7 @@ export default function App(){
 }
 function Shell({profile,error,setError}:{profile:UserProfile;error:string;setError:(x:string)=>void}){
  const[screen,setScreen]=useState<Screen>('dashboard'),[refresh,setRefresh]=useState(0),[modal,setModal]=useState<{type:string;member?:Member;payment?:Payment}|null>(null);const bump=()=>setRefresh(x=>x+1);
- useEffect(()=>{const fn=(e:any)=>{const type=String(e.type);const m=e.detail;setModal({type:type.replace('gym:',''),member:m})};window.addEventListener('gym:open',fn);return()=>window.removeEventListener('gym:open',fn)},[]);
+ useEffect(()=>{const fn=(e:Event)=>{const ce=e as CustomEvent;setModal({type:e.type.replace('gym:',''),member:ce.detail})};const names=['gym:open','gym:renew','gym:payment','gym:freeze','gym:cancel','gym:message'];names.forEach(n=>window.addEventListener(n,fn));const refreshFn=()=>setRefresh(x=>x+1);window.addEventListener('gym:refresh',refreshFn);return()=>{names.forEach(n=>window.removeEventListener(n,fn));window.removeEventListener('gym:refresh',refreshFn)}},[]);
  const open=(type:string,member?:Member,payment?:Payment)=>setModal({type,member,payment});const close=()=>setModal(null);
  const toast=(s:string)=>{setError(s);setTimeout(()=>setError(''),2200)};
  return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{nav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={()=>supabase?.auth.signOut()}><LogOut size={15}/></button></div></aside>
