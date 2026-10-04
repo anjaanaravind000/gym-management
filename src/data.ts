@@ -36,7 +36,7 @@ export type GymSettings = {
 export type PaymentMethodSetting = { gym_id:string; payment_method:string; enabled:boolean };
 export type Template = {
   id:string; gym_id:string; notification_type:string; channel:string; subject:string|null; body:string; enabled:boolean;
-  provider_template_name:string|null; provider_template_language:string;
+  provider_template_name:string|null; provider_template_language:string; provider_template_variables:string[];
 };
 
 function requireClient(){if(!supabase)throw new Error('Supabase is not configured.');return supabase}
