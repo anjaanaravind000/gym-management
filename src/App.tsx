@@ -22,8 +22,8 @@ export default function App(){
  const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[reset,setReset]=useState(false),[error,setError]=useState('');
  useEffect(()=>{if(!supabase){setLoading(false);return}let live=true;
   supabase.auth.getSession().then(async({data})=>{if(!live)return;setSession(data.session);if(data.session)try{setProfile(await loadProfile(data.session.user.id))}catch(e:any){setError(humanError(e))}setLoading(false)});
-  const{sub}=supabase.auth.onAuthStateChange((event,s)=>{setSession(s);if(event==='PASSWORD_RECOVERY')setReset(true);if(s)loadProfile(s.user.id).then(setProfile).catch((e:any)=>setError(humanError(e)));else setProfile(null)});
-  return()=>{live=false;sub?.unsubscribe()};
+  const{data:{subscription}}=supabase.auth.onAuthStateChange((event,s)=>{setSession(s);if(event==='PASSWORD_RECOVERY')setReset(true);if(s)loadProfile(s.user.id).then(setProfile).catch((e:any)=>setError(humanError(e)));else setProfile(null)});
+  return()=>{live=false;subscription.unsubscribe()};
  },[]);
  if(!supabase)return <Config config={supabaseConfig}/>;
  if(loading)return <AuthWrap title="Loading your gym"><p>Checking secure session…</p></AuthWrap>;
