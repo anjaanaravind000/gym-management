@@ -4,6 +4,8 @@ import { Bell, Check, ChevronLeft, ChevronRight, Dumbbell, FileText, LogOut, Mor
 import { money } from '../data';
 const formatLabel=(value:string)=>String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
 
+export { money };
+
 export function Brand(){return <div className="brand"><div className="brand-mark"><Dumbbell size={19}/></div><div><b>FitCore</b><span>Gym Management</span></div></div>}
 export function PageHeader({title,subtitle,action}:{title:string;subtitle:string;action?:React.ReactNode}){return <header className="topbar"><div><div className="eyebrow">GYM MANAGEMENT</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</header>}
 export function Panel({title,extra,children}:{title:string;extra?:React.ReactNode;children:React.ReactNode}){return <section className="panel"><div className="section-title"><div><h2>{title}</h2></div>{extra}</div>{children}</section>}
