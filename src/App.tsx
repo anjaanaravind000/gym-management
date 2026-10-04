@@ -1,10 +1,10 @@
 import React,{useEffect,useState}from'react';
 import{Activity,BarChart3,Bell,Check,FileBarChart,Home,LogOut,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,Users,WalletCards}from'lucide-react';
 import{supabase,supabaseConfig}from'./supabase';
-import{loadProfile}from'./data';
+import{getCurrentAppSession,loadProfile,logoutAppSession}from'./data';
 import type{Member,Payment,UserProfile}from'./data';
 import{Brand,humanError}from'./components/ui';
-import{AuthScreen,ResetPassword,SetupScreen}from'./components/auth';
+import{AuthScreen,SetupScreen}from'./components/auth';
 import{Dashboard}from'./screens/dashboard';
 import{Members,MemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
@@ -19,25 +19,25 @@ const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck}
 ];
 export default function App(){
- const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[reset,setReset]=useState(false),[error,setError]=useState('');
+ const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
  useEffect(()=>{if(!supabase){setLoading(false);return}let live=true;
-  supabase.auth.getSession().then(async({data})=>{if(!live)return;setSession(data.session);if(data.session)try{setProfile(await loadProfile(data.session.user.id))}catch(e:any){setError(humanError(e))}setLoading(false)});
-  const{data:{subscription}}=supabase.auth.onAuthStateChange((event,s)=>{setSession(s);if(event==='PASSWORD_RECOVERY')setReset(true);if(s)loadProfile(s.user.id).then(setProfile).catch((e:any)=>setError(humanError(e)));else setProfile(null)});
-  return()=>{live=false;subscription.unsubscribe()};
+  getCurrentAppSession().then(async s=>{if(!live)return;if(s){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}setLoading(false)}).catch((e:any)=>{if(!live)return;setError(humanError(e));setLoading(false)});
+  return()=>{live=false};
  },[]);
+ async function signedIn(s:any){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}
+ async function signOut(){await logoutAppSession();setSession(null);setProfile(null)}
  if(!supabase)return <Config config={supabaseConfig}/>;
  if(loading)return <AuthWrap title="Loading your gym"><p>Checking secure session…</p></AuthWrap>;
- if(reset)return <ResetPassword onDone={()=>setReset(false)}/>;
- if(!session)return <AuthScreen/>;
- if(!profile)return <SetupScreen user={session.user} onDone={async()=>setProfile(await loadProfile(session.user.id))}/>;
- return <Shell profile={profile} error={error} setError={setError}/>;
+ if(!session)return <AuthScreen onSignedIn={signedIn}/>;
+ if(!profile)return <SetupScreen user={session} onDone={async()=>setProfile(await loadProfile(session.user_id))}/>;
+ return <Shell profile={profile} error={error} setError={setError} onLogout={signOut}/>
 }
-function Shell({profile,error,setError}:{profile:UserProfile;error:string;setError:(x:string)=>void}){
+function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:string;setError:(x:string)=>void;onLogout:()=>Promise<void>}){
  const[screen,setScreen]=useState<Screen>('dashboard'),[refresh,setRefresh]=useState(0),[modal,setModal]=useState<{type:string;member?:Member;payment?:Payment}|null>(null);const bump=()=>setRefresh(x=>x+1);
  useEffect(()=>{const fn=(e:Event)=>{const ce=e as CustomEvent;setModal({type:e.type.replace('gym:',''),member:ce.detail})};const names=['gym:open','gym:renew','gym:payment','gym:freeze','gym:cancel','gym:message'];names.forEach(n=>window.addEventListener(n,fn));const refreshFn=()=>setRefresh(x=>x+1);window.addEventListener('gym:refresh',refreshFn);return()=>{names.forEach(n=>window.removeEventListener(n,fn));window.removeEventListener('gym:refresh',refreshFn)}},[]);
  const open=(type:string,member?:Member,payment?:Payment)=>setModal({type,member,payment});const close=()=>setModal(null);
  const toast=(s:string)=>{setError(s);setTimeout(()=>setError(''),2200)};
- return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{nav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={()=>supabase?.auth.signOut()}><LogOut size={15}/></button></div></aside>
+ return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{nav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={onLogout}><LogOut size={15}/></button></div></aside>
  <main className="main">{error&&<div className="toast inline-toast">{error}</div>}{screen==='dashboard'&&<Dashboard gymId={profile.gym_id} onNavigate={setScreen} onOpen={open} refresh={refresh}/>}
  {screen==='members'&&<Members gymId={profile.gym_id} refresh={refresh} onRefresh={bump} onOpen={open}/>}
  {screen==='memberships'&&<Memberships gymId={profile.gym_id} refresh={refresh}/>}
