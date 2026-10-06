@@ -5,7 +5,7 @@ import type{Member,Package,Staff}from'../data';
 import{DataTable,Detail,Empty,Field,Metric,Pagination,Panel,PageHeader,Sheet,StatusTag,Summary,Toggle,humanError,initials}from'../components/ui';
 
 const METHODS=['cash','upi','card','bank_transfer','cheque','other'];
-const today=()=>new Date().toISOString().slice(0,10);
+const today=localToday;
 const addDay=(s:string,n:number)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
 
 export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:number;onRefresh:()=>void;onOpen:(x:any)=>void}){
