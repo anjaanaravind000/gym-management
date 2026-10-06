@@ -36,10 +36,10 @@ export function Summary({title,value}:{title:string;value:React.ReactNode}){retu
 export function Detail({label,value}:{label:string;value:string}){return <div className="detail"><span>{label}</span><b>{value}</b></div>}
 export function DataTable({rows,actions}:{rows:any[];actions?:(row:any)=>React.ReactNode}){
  const[sort,setSort]=React.useState<{key:string;dir:1|-1}|null>(null);
- if(!rows.length)return <Empty title="No data" text="Nothing to show yet."/>;
- const cols=Object.keys(rows[0]);
+ const cols=rows.length?Object.keys(rows[0]):[];
  const columnSignature=cols.join('|');
  React.useEffect(()=>{setSort(prev=>prev&&cols.includes(prev.key)?prev:null)},[columnSignature]);
+ if(!rows.length)return <Empty title="No data" text="Nothing to show yet."/>;
  const sorted=[...rows].sort((a,b)=>{
   if(!sort)return 0;
   const av=a[sort.key],bv=b[sort.key];
