@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useState}from'react';
 import{ArrowLeft,CircleDollarSign,Edit3,MessageCircle,PauseCircle,Phone,Plus,RefreshCw,Search,Snowflake,Trash2,UserCheck,UserPlus}from'lucide-react';
-import{cancelMembership,checkoutAttendance,createMember,findMemberByPhone,freezeMembership,localToday,loadMemberDetail,loadMembers,loadPackages,loadStaff,money,recordAttendance,recordPayment,refundPayment,renewMembership,setMemberStatus,signedMemberPhoto,uploadMemberPhoto}from'../data';
+import{cancelMembership,checkoutAttendance,createMember,deleteMember,findMemberByPhone,freezeMembership,localToday,loadMemberDetail,loadMembers,loadPackages,loadStaff,money,recordAttendance,recordPayment,refundPayment,renewMembership,setMemberStatus,signedMemberPhoto,uploadMemberPhoto}from'../data';
 import type{Member,Package,Staff}from'../data';
 import{DataTable,Detail,Empty,Field,Metric,Pagination,Panel,PageHeader,Sheet,StatusTag,Summary,Toggle,humanError,initials}from'../components/ui';
 
@@ -12,7 +12,7 @@ export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:n
  const[q,setQ]=useState(''),[status,setStatus]=useState('all'),[payment,setPayment]=useState('all'),[page,setPage]=useState(0),[data,setData]=useState<Member[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');const size=20;
  useEffect(()=>{let a=true;setBusy(true);loadMembers({gymId,page,pageSize:size,q,status,paymentStatus:payment}).then(r=>a&&(setData(r.rows),setCount(r.count),setError(''))).catch((x:any)=>a&&setError(humanError(x))).finally(()=>a&&setBusy(false));return()=>{a=false}},[gymId,page,q,status,payment,refresh]);
  return <><PageHeader title="Members" subtitle={count+' live members'} action={<div className="toolbar-actions"><button className="primary" onClick={()=>onOpen('add')}><Plus size={17}/> Add member</button><button className="icon-button" onClick={onRefresh}><RefreshCw size={18}/></button></div>}/>
- {error&&<div className="error-banner">{error}<button onClick={()=>setError('')}>Dismiss</button></div>}<div className="filters-row"><div className="search-box"><Search size={18}/><input value={q} onChange={e=>{setQ(e.target.value);setPage(0)}} placeholder="Search name, mobile or Member ID"/></div><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">All statuses</option>{['active','expiring_soon','grace_period','did_not_renew','expired','frozen','cancelled'].map(x=><option key={x}>{x}</option>)}</select><select value={payment} onChange={e=>{setPayment(e.target.value);setPage(0)}}><option value="all">Any payment</option><option value="paid">Paid</option><option value="partially_paid">Partially paid</option><option value="pending">Pending</option></select></div>
+ {error&&<div className="error-banner">{error}<button onClick={()=>setError('')}>Dismiss</button></div>}<div className="filters-row"><div className="search-box"><Search size={18}/><input value={q} onChange={e=>{setQ(e.target.value);setPage(0)}} placeholder="Search name, mobile or Member ID"/></div><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">All statuses</option>{['active','expiring_soon','grace_period','did_not_renew','expired','frozen','cancelled','inactive'].map(x=><option key={x}>{x}</option>)}</select><select value={payment} onChange={e=>{setPayment(e.target.value);setPage(0)}}><option value="all">Any payment</option><option value="paid">Paid</option><option value="partially_paid">Partially paid</option><option value="pending">Pending</option></select></div>
  <div className="member-list">{data.map(m=><button className="member-card" key={m.id} onClick={()=>onOpen({type:'profile',member:m})}><div className="avatar member-avatar">{initials(m.name)}</div><div className="member-main"><b>{m.name}</b><span>#{m.member_id} · {m.phone}</span><div><StatusTag value={m.membership_status||m.member_status}/><span className="member-package">{m.package_name||'Custom'} · {m.end_date||'No expiry'}</span></div></div><span className="member-balance">{m.balance_amount>0?money(m.balance_amount):'Paid'}</span></button>)}</div>
  {!busy&&!data.length&&<Empty title={q?'No matching members':'No members yet'} text={q?'Try another search or filter.':'Your database is empty. Add the first member.'} action={<button className="secondary" onClick={()=>onOpen('add')}><UserPlus size={16}/> Add member</button>}/>}
  <Pagination page={page} pages={Math.max(1,Math.ceil(count/size))} onPage={setPage}/></>
@@ -64,6 +64,18 @@ export function MemberProfile({gymId,member,onClose,onRefresh,isAdmin}:{gymId:st
   }catch(x:any){setError(humanError(x))}
   finally{setAttendanceBusy(false)}
  };
+ const removeMember=async()=>{
+  const confirmed=window.confirm('Delete this member? Members with financial or attendance history will be archived instead of permanently deleted.');
+  if(!confirmed)return;
+  setAttendanceBusy(true);setError('');
+  try{
+   const result=await deleteMember(gymId,m.id);
+   onRefresh();
+   if(result==='deleted') onClose();
+   else setError('Member has historical records, so it was archived and removed from the active member list.');
+  }catch(x:any){setError(humanError(x))}
+  finally{setAttendanceBusy(false)}
+ };
  return <Sheet title={m.name} onClose={onClose}>
   <div className="profile-hero"><div className="avatar xlarge">{initials(m.name)}</div><div><h2>{m.name}</h2><span>#{m.member_id} · {m.phone}</span><div><StatusTag value={m.membership_status||m.member_status}/></div></div></div>
   <div className="action-grid">
@@ -75,6 +87,7 @@ export function MemberProfile({gymId,member,onClose,onRefresh,isAdmin}:{gymId:st
    <a className="secondary" href={'tel:'+m.phone}><Phone size={16}/> Call</a>
    <button type="button" className="secondary" disabled={!m.membership_uuid} onClick={()=>window.dispatchEvent(new CustomEvent('gym:freeze',{detail:m}))}><Snowflake size={16}/> Freeze</button>
    <button type="button" className="secondary" disabled={!m.membership_uuid} onClick={()=>window.dispatchEvent(new CustomEvent('gym:cancel',{detail:m}))}><Trash2 size={16}/> Cancel</button>
+   {isAdmin&&<button type="button" className="danger-action" disabled={attendanceBusy} onClick={removeMember}><Trash2 size={16}/> Delete member</button>}
   </div>
   <div className="tab-row">{['overview','payments','membership','attendance','notifications','activity'].map(x=><button type="button" key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>
   {tab==='overview'&&<>
