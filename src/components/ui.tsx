@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useEffect} from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Bell, Check, ChevronLeft, ChevronRight, Dumbbell, FileText, LogOut, MoreHorizontal, X } from 'lucide-react';
 import { money } from '../data';
@@ -9,7 +9,22 @@ export { money };
 export function Brand(){return <div className="brand"><div className="brand-mark"><Dumbbell size={19}/></div><div><b>FitCore</b><span>Gym Management</span></div></div>}
 export function PageHeader({title,subtitle,action}:{title:string;subtitle:string;action?:React.ReactNode}){return <header className="topbar"><div><div className="eyebrow">GYM MANAGEMENT</div><h1>{title}</h1><p>{subtitle}</p></div>{action}</header>}
 export function Panel({title,extra,children}:{title:string;extra?:React.ReactNode;children:React.ReactNode}){return <section className="panel"><div className="section-title"><div><h2>{title}</h2></div>{extra}</div>{children}</section>}
-export function Sheet({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}){return <div className="sheet-backdrop" onMouseDown={e=>e.currentTarget===e.target&&onClose()}><div className="sheet"><div className="sheet-handle"/><div className="sheet-head"><h2>{title}</h2><button className="icon-button" onClick={onClose}><X size={18}/></button></div>{children}</div></div>}
+export function Sheet({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}){
+ useEffect(()=>{
+  const previous=document.body.style.overflow;
+  document.body.style.overflow='hidden';
+  const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose()};
+  window.addEventListener('keydown',onKey);
+  return()=>{document.body.style.overflow=previous;window.removeEventListener('keydown',onKey)};
+ },[onClose]);
+ return <div className="sheet-backdrop" role="presentation" onMouseDown={e=>e.currentTarget===e.target&&onClose()}>
+  <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+   <div className="sheet-handle"/>
+   <div className="sheet-head"><h2>{title}</h2><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={18}/></button></div>
+   {children}
+  </div>
+ </div>
+}
 export function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="field"><span>{label}</span>{children}</label>}
 export function Toggle({label,checked,onChange}:{label?:string;checked:boolean;onChange:(v:boolean)=>void}){return <label className="toggle-row">{label&&<span>{label}</span>}<button type="button" className={checked?'switch on':'switch'} onClick={()=>onChange(!checked)} aria-pressed={checked}><i/></button></label>}
 export function Metric({title,value,detail,warning}:{title:string;value:React.ReactNode;detail?:string;warning?:boolean}){return <div className={warning?'metric-card warn':'metric-card'}><span>{title}</span><strong>{value}</strong>{detail&&<small>{detail}</small>}</div>}
