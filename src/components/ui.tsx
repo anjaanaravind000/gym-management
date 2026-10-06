@@ -44,8 +44,9 @@ export function DataTable({rows,actions}:{rows:any[];actions?:(row:any)=>React.R
   if(av===bv)return 0;
   if(av===null||av===undefined||av==='')return 1;
   if(bv===null||bv===undefined||bv==='')return -1;
-  const an=Number(av),bn=Number(bv);
-  if(Number.isFinite(an)&&Number.isFinite(bn)&&String(av).trim()!==''&&String(bv).trim()!=='')return(an-bn)*sort.dir;
+  const parseNumber=(v:any)=>{const s=String(v).trim();if(!/^[₹$€£]?\s*-?\d[\d,]*(\.\d+)?%?$/.test(s))return null;const n=Number(s.replace(/[^0-9.-]/g,''));return Number.isFinite(n)?n:null};
+  const an=parseNumber(av),bn=parseNumber(bv);
+  if(an!==null&&bn!==null)return(an-bn)*sort.dir;
   const ad=new Date(av),bd=new Date(bv);
   if(!Number.isNaN(ad.getTime())&&!Number.isNaN(bd.getTime())&&String(av).length>8&&String(bv).length>8)return(ad.getTime()-bd.getTime())*sort.dir;
   return String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'})*sort.dir;
@@ -57,6 +58,6 @@ export function DataTable({rows,actions}:{rows:any[];actions?:(row:any)=>React.R
 }
 export function renderCell(key:string,value:any){if(value===null||value===undefined||value==='')return '—';const k=key.toLowerCase();if(k.includes('amount')||k.includes('revenue')||k.includes('balance')||k.includes('price')||k==='net_amount'||k==='refund_amount'||k==='total_amount')return money(Number(value));if(k.includes('date')||k.endsWith('_at')||k==='check_in'||k==='check_out')return String(value).includes('T')?new Date(value).toLocaleString('en-IN'):new Date(String(value)+'T00:00:00').toLocaleDateString('en-IN');return formatLabel(String(value))}
 export function initials(name:string){return name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'GM'}
-export function humanError(error:any){const s=error?.message||error?.error_description||'Something went wrong. Please try again.';const map:any={'Unauthorized':'You do not have permission to perform this action.','Member ID already exists':'That Member ID already exists.','Transaction reference already exists':'That transaction reference is already in use.','Payment amount must be greater than zero':'Enter a valid payment amount.','An existing member with this mobile number was found':'An existing member with this mobile number was found.'};return map[s]||s}
+export function humanError(error:any){const s=error?.message||error?.error_description||'Something went wrong. Please try again.';const map:any={'Unauthorized':'You do not have permission to perform this action.','Member ID already exists':'That Member ID already exists.','Transaction reference already exists':'That transaction reference is already in use.','Payment amount must be greater than zero':'Enter a valid payment amount.','Payment exceeds outstanding balance':'Payment exceeds the outstanding balance.','Refund amount must be greater than zero':'Enter a valid refund amount.','Refund exceeds original payment amount':'Refund exceeds the original payment amount.','Only an admin can delete members':'Only an admin can delete members.','Member has historical records':'This member has historical records and was archived instead.','An existing member with this mobile number was found':'An existing member with this mobile number was found.'};return map[s]||s}
 export function Skeleton(){return <div className="skeleton"/>}
 export function LogoutButton(){return <button className="icon-button mini" title="Sign out" onClick={()=>undefined}><LogOut size={15}/></button>}
