@@ -305,3 +305,9 @@ th,td{border-bottom-color:#202a22}
 .tab-row{scrollbar-width:none}
 .tab-row::-webkit-scrollbar{display:none}
 @media(max-width:720px){.sheet-backdrop{padding:10px}.sheet{max-height:94vh;border-radius:20px;padding-left:15px;padding-right:15px}.sheet-head{top:-8px}.tab-row{top:54px;margin-left:-15px;margin-right:-15px;padding-left:15px;padding-right:15px}}
+
+.danger-action{min-height:44px;padding:0 14px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:750;color:#ffdce1;background:#2a171b;border:1px solid #63313c}
+.danger-action:hover{background:#351b20;border-color:#8b414d}
+.danger-action:disabled{opacity:.55;cursor:not-allowed}
+.sort-button span{font-size:11px;opacity:.65}
+.sort-button:hover span,.sort-button:focus-visible span{opacity:1}
