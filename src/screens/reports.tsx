@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState}from'react';
 import{Area,AreaChart,Bar,BarChart,CartesianGrid,Line,LineChart,ResponsiveContainer,Tooltip,XAxis,YAxis}from'recharts';
 import{Download,FileText,Printer}from'lucide-react';
-import{exportReport,loadAnalytics,loadCoachPerformance,loadReport,money,type ReportName}from'../data';
+import{exportReport,loadAnalytics,loadCoachPerformance,loadReport,localToday,money,type ReportName}from'../data';
 import{DataTable,Empty,Metric,Panel,PageHeader,Pagination,StatusTag}from'../components/ui';
 
 function range(p:string){const d=new Date(),today=d.toISOString().slice(0,10);if(p==='today')return{from:today,to:today};if(p==='week'){const x=new Date(d);x.setDate(d.getDate()-d.getDay());return{from:x.toISOString().slice(0,10),to:today}}if(p==='last'){return{from:new Date(d.getFullYear(),d.getMonth()-1,1).toISOString().slice(0,10),to:new Date(d.getFullYear(),d.getMonth(),0).toISOString().slice(0,10)}}if(p==='year')return{from:d.getFullYear()+'-01-01',to:today};return{from:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01',to:today}}
