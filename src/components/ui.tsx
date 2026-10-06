@@ -38,6 +38,8 @@ export function DataTable({rows,actions}:{rows:any[];actions?:(row:any)=>React.R
  const[sort,setSort]=React.useState<{key:string;dir:1|-1}|null>(null);
  if(!rows.length)return <Empty title="No data" text="Nothing to show yet."/>;
  const cols=Object.keys(rows[0]);
+ const columnSignature=cols.join('|');
+ React.useEffect(()=>{setSort(prev=>prev&&cols.includes(prev.key)?prev:null)},[columnSignature]);
  const sorted=[...rows].sort((a,b)=>{
   if(!sort)return 0;
   const av=a[sort.key],bv=b[sort.key];
