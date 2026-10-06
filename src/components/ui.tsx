@@ -34,7 +34,7 @@ export function Empty({title,text,action}:{title:string;text:string;action?:Reac
 export function Pagination({page,pages,onPage}:{page:number;pages:number;onPage:(p:number)=>void}){return <div className="pagination"><button className="secondary small" disabled={page<=0} onClick={()=>onPage(page-1)}><ChevronLeft size={15}/> Previous</button><span>{page+1} / {pages}</span><button className="secondary small" disabled={page>=pages-1} onClick={()=>onPage(page+1)}>Next <ChevronRight size={15}/></button></div>}
 export function Summary({title,value}:{title:string;value:React.ReactNode}){return <div className="summary-item"><span>{title}</span><b>{value}</b></div>}
 export function Detail({label,value}:{label:string;value:string}){return <div className="detail"><span>{label}</span><b>{value}</b></div>}
-export function DataTable({rows}:{rows:any[]}){
+export function DataTable({rows,actions}:{rows:any[];actions?:(row:any)=>React.ReactNode}){
  const[sort,setSort]=React.useState<{key:string;dir:1|-1}|null>(null);
  if(!rows.length)return <Empty title="No data" text="Nothing to show yet."/>;
  const cols=Object.keys(rows[0]);
@@ -53,7 +53,7 @@ export function DataTable({rows}:{rows:any[]}){
  return <div className="table-wrap"><table><thead><tr>{cols.map(c=>{
   const active=sort?.key===c;
   return <th key={c}><button type="button" className="sort-button" aria-label={`Sort by ${formatLabel(c)}`} aria-sort={active?(sort?.dir===1?'ascending':'descending'):'none'} onClick={()=>setSort(active?{key:c,dir:sort!.dir===1?-1:1}:{key:c,dir:1})}>{formatLabel(c)} <span aria-hidden="true">{active?(sort?.dir===1?'↑':'↓'):'↕'}</span></button></th>
- })}</tr></thead><tbody>{sorted.map((r,i)=><tr key={r.id||r.payment_id||r.member_id||i}>{cols.map(c=><td key={c}>{renderCell(c,r[c])}</td>)}</tr>)}</tbody></table></div>
+ })}{actions&&<th>Actions</th>}</tr></thead><tbody>{sorted.map((r,i)=><tr key={r.id||r.payment_id||r.member_id||i}>{cols.map(c=><td key={c}>{renderCell(c,r[c])}</td>)}{actions&&<td>{actions(r)}</td>}</tr>)}</tbody></table></div>
 }
 export function renderCell(key:string,value:any){if(value===null||value===undefined||value==='')return '—';const k=key.toLowerCase();if(k.includes('amount')||k.includes('revenue')||k.includes('balance')||k.includes('price')||k==='net_amount'||k==='refund_amount'||k==='total_amount')return money(Number(value));if(k.includes('date')||k.endsWith('_at')||k==='check_in'||k==='check_out')return String(value).includes('T')?new Date(value).toLocaleString('en-IN'):new Date(String(value)+'T00:00:00').toLocaleDateString('en-IN');return formatLabel(String(value))}
 export function initials(name:string){return name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'GM'}
