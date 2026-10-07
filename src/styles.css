@@ -354,3 +354,34 @@ th,td{border-bottom-color:#202a22}
  .import-savebar{display:grid;gap:8px;padding-top:12px}.save-state{padding:0 2px}.save-state small{font-size:9px}.import-savebar .form-actions{display:grid;grid-template-columns:1fr 1.45fr;gap:7px}.import-savebar .form-actions button{width:100%;min-width:0}.import-submit{min-height:50px}
  .success-summary{grid-template-columns:1fr}.old-member-success{padding-top:18px}
 }
+
+/* Old-member save-state refinements */
+.old-member-form .form-section{scroll-margin-top:72px}
+.import-savebar{border-top:1px solid rgba(42,53,45,.7)}
+.button-spinner{width:14px;height:14px;border:2px solid rgba(12,18,11,.28);border-top-color:#0c120b;border-radius:50%;display:inline-block;animation:buttonSpin .7s linear infinite}
+.success-kicker{font-size:9px;letter-spacing:.16em;font-weight:900;color:#7c8a80}
+.success-warning{width:100%;display:grid;gap:3px;padding:11px 12px;border:1px solid #675126;border-radius:12px;background:#241d12;text-align:left;color:#f3d894}
+.success-warning b{font-size:11px}.success-warning span{font-size:10px;line-height:1.45;color:#dfc68c}
+@keyframes buttonSpin{to{transform:rotate(360deg)}}
+@media(max-width:720px){
+ .old-member-form .form-section{padding-top:15px}
+ .old-member-form .form-grid{gap:10px}
+ .old-member-form .field{gap:5px}
+ .old-member-form .field input,.old-member-form .field select,.old-member-form .field textarea{min-height:50px;font-size:16px}
+ .old-member-form .field textarea{min-height:96px}
+ .old-member-form .old-member-intro b{font-size:13px}
+ .old-member-form .form-hint{font-size:9px}
+ .old-member-form .step-badge{margin-top:1px}
+ .old-member-form .package-choice{min-height:90px}
+ .old-member-form .status-preview-card,.old-member-form .membership-toggle-card{align-items:flex-start}
+ .old-member-form .status-preview-card>.status-tag{margin-top:1px;flex:0 0 auto}
+ .import-savebar{margin-left:-5px;margin-right:-5px;padding-left:5px;padding-right:5px}
+ .save-state small{max-width:240px}
+}
+@media(max-width:420px){
+ .old-member-form .old-package-grid{grid-template-columns:1fr}
+ .old-member-form .old-package-grid .package-choice{min-height:78px}
+ .old-member-form .calculation{grid-template-columns:1fr 1fr}
+ .old-member-form .calculation .summary-item b{font-size:15px}
+ .import-savebar .form-actions{grid-template-columns:.85fr 1.4fr}
+}
