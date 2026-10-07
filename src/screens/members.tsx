@@ -18,7 +18,7 @@ export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:n
  <Pagination page={page} pages={Math.max(1,Math.ceil(count/20))} onPage={setPage}/>
  </>}
 export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAdmin:boolean;onClose:()=>void;onSaved:(memberId?:string)=>void}){
- const[packages,setPackages]=useState<Package[]>([]),[staff,setStaff]=useState<Staff[]>([]);
+ const[packages,setPackages]=useState<Package[]>([]),[staff,setStaff]=useState<Staff[]>([]),[methods,setMethods]=useState<string[]>(METHODS);
  const[dup,setDup]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const[f,setF]=useState<any>({
   name:'',phone:'',memberId:'',email:'',dob:'',gender:'',address:'',emergencyContact:'',emergencyPhone:'',
@@ -34,8 +34,8 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   else{d.setMonth(d.getMonth()+duration);if(d.getDate()>=original)d.setDate(d.getDate()-1)}
   return toYmd(d);
  };
- useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId)]).then(([p,s])=>{
-   setPackages(p);setStaff(s);
+ useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId),loadPaymentMethodSettings(gymId)]).then(([p,s,ms])=>{
+   setPackages(p);setStaff(s);setMethods(ms.filter((x:any)=>x.enabled).map((x:any)=>x.payment_method));
    setF((old:any)=>{
     const first=p.find((x:any)=>x.status==='active')||p[0];
     if(!first||old.packageId)return {...old,coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
@@ -95,12 +95,12 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
     <Field label="Amount paid"><input type="number" min="0" max={final} step="0.01" value={f.amountPaid} onChange={e=>setF({...f,amountPaid:Number(e.target.value)})}/></Field>
    </div>
    <div className="calculation"><Summary title="Price" value={money(Number(f.price||0))}/><Summary title="Final" value={money(final)}/><Summary title="Paid" value={money(Number(f.amountPaid||0))}/><Summary title="Balance" value={money(balance)}/></div>
-   {Number(f.amountPaid)>0&&<div className="form-grid"><Field label="Payment date"><input type="date" value={f.paymentDate} onChange={e=>setF({...f,paymentDate:e.target.value})}/></Field><Field label="Payment method"><select value={f.paymentMethod} onChange={e=>setF({...f,paymentMethod:e.target.value})}>{METHODS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Reference"><input value={f.reference} onChange={e=>setF({...f,reference:e.target.value})}/></Field></div>}
+   {Number(f.amountPaid)>0&&<>{!methods.length&&<div className="warning-card"><b>No payment methods enabled</b><span>Enable at least one payment method in Settings before recording a historical payment.</span></div>}<div className="form-grid"><Field label="Payment date"><input type="date" min={f.membershipStart} max={today()} required value={f.paymentDate} onChange={e=>setF({...f,paymentDate:e.target.value})}/></Field><Field label="Payment method"><select required disabled={!methods.length} value={f.paymentMethod} onChange={e=>setF({...f,paymentMethod:e.target.value})}>{methods.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Reference"><input value={f.reference} onChange={e=>setF({...f,reference:e.target.value})}/></Field></div></>}
    <Field label="Membership / payment notes"><textarea value={f.paymentNotes} onChange={e=>setF({...f,paymentNotes:e.target.value})}/></Field>
    </>}
   </div>
   {error&&<div className="error-inline">{error}</div>}
-  <button className="primary full" disabled={busy}>{busy?'Adding…':'Add old member'}</button>
+  <button className="primary full" disabled={busy||!!(f.addMembership&&Number(f.amountPaid)>0&&!methods.length)}>{busy?'Adding…':f.addMembership&&Number(f.amountPaid)>0&&!methods.length?'Enable a payment method first':'Add old member'}</button>
  </form></Sheet>
 }
 
