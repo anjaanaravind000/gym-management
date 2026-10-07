@@ -140,6 +140,41 @@ export async function saveLead(a:any){return unwrap(await requireClient().rpc('s
 export async function deleteLead(gymId:string,leadId:string){return unwrap(await requireClient().rpc('delete_lead',{p_gym_id:gymId,p_lead_id:leadId})) as unknown}
 
 export async function convertLead(gymId:string,leadId:string,memberId:string){return unwrap(await requireClient().rpc('convert_lead',{p_gym_id:gymId,p_lead_id:leadId,p_member_id:memberId})) as unknown}
+export type GymClass={id:string;gym_id:string;name:string;description:string|null;duration_minutes:number;capacity:number;status:string;created_by:string|null};
+export type ClassSession={id:string;gym_id:string;class_id:string;class_name:string;class_description:string|null;duration_minutes:number;capacity:number;instructor_id:string;instructor_name:string;start_at:string;end_at:string;status:string;cancellation_reason:string|null;booked_count:number;waitlist_count:number};
+export type ClassBooking={id:string;gym_id:string;member_id:string;session_id:string;status:string;waitlist_position:number|null;booked_at:string;cancelled_at:string|null;start_at:string;end_at:string;session_status:string;class_name:string;instructor_name:string;capacity:number};
+
+export async function loadClasses(gymId:string,includeInactive=true){
+ let q=requireClient().from('gym_classes').select('*').eq('gym_id',gymId).order('status').order('name');
+ if(!includeInactive)q=q.eq('status','active');
+ return unwrap(await q) as GymClass[];
+}
+export async function saveClass(a:{gymId:string;id?:string|null;name:string;description?:string|null;durationMinutes:number;capacity:number;status?:string}){return unwrap(await requireClient().rpc('save_class',{
+ p_gym_id:a.gymId,p_class_id:a.id??null,p_name:a.name,p_description:a.description??null,p_duration_minutes:a.durationMinutes,p_capacity:a.capacity,p_status:a.status??'active'
+})) as string}
+export async function loadClassTimetable(gymId:string,from:string,to:string,instructorId?:string,classId?:string){
+ let q=requireClient().from('class_timetable_report').select('*').eq('gym_id',gymId).gte('start_at',from).lt('start_at',to).order('start_at');
+ if(instructorId&&instructorId!=='all')q=q.eq('instructor_id',instructorId);
+ if(classId&&classId!=='all')q=q.eq('class_id',classId);
+ return unwrap(await q) as ClassSession[];
+}
+export async function saveClassSession(a:{gymId:string;id?:string|null;classId:string;instructorId:string;startLocal:string;endLocal:string;capacity?:number|null;repeatWeeks?:number}){return unwrap(await requireClient().rpc('save_class_session',{
+ p_gym_id:a.gymId,p_session_id:a.id??null,p_class_id:a.classId,p_instructor_id:a.instructorId,p_start_local:a.startLocal,p_end_local:a.endLocal,p_capacity:a.capacity??null,p_repeat_weeks:a.repeatWeeks??1
+})) as string[]}
+export async function cancelClassSession(gymId:string,sessionId:string,reason:string){return unwrap(await requireClient().rpc('cancel_class_session',{p_gym_id:gymId,p_session_id:sessionId,p_reason:reason})) as unknown}
+export async function bookClass(gymId:string,sessionId:string,memberId:string){return unwrap(await requireClient().rpc('book_class',{p_gym_id:gymId,p_session_id:sessionId,p_member_id:memberId})) as {status:string;waitlist_position:number|null}}
+export async function cancelClassBooking(gymId:string,bookingId:string){return unwrap(await requireClient().rpc('cancel_class_booking',{p_gym_id:gymId,p_booking_id:bookingId})) as {cancelled:boolean;promoted:boolean}}
+export async function setClassBookingAttendance(gymId:string,bookingId:string,status:'attended'|'no_show'){return unwrap(await requireClient().rpc('set_class_booking_attendance',{p_gym_id:gymId,p_booking_id:bookingId,p_status:status})) as unknown}
+export async function loadMemberClassBookings(gymId:string,memberId:string,from?:string){
+ let q=requireClient().from('member_class_bookings_report').select('*').eq('gym_id',gymId).eq('member_id',memberId).order('start_at');
+ if(from)q=q.gte('start_at',from);
+ return unwrap(await q) as ClassBooking[];
+}
+export async function loadClassRoster(gymId:string,sessionId:string){
+ const q=await requireClient().from('class_bookings').select('id,member_id,status,waitlist_position,booked_at,cancelled_at,members!inner(name,member_id,phone)').eq('gym_id',gymId).eq('session_id',sessionId).order('status').order('waitlist_position',{ascending:true,nullsFirst:false}).order('booked_at');
+ return unwrap(q) as any[];
+}
+
 export async function loadNotifications(gymId:string,page:number,pageSize:number){const{data,error,count}=await requireClient().from('notifications').select('*,members(name,member_id,phone)',{count:'exact'}).eq('gym_id',gymId).order('created_at',{ascending:false}).range(page*pageSize,page*pageSize+pageSize-1);if(error)throw error;return{rows:(data??[]).map((n:any)=>({...n,member_name:n.members?.name??null,member_code:n.members?.member_id??null,member_phone:n.members?.phone??null}))as Notification[],count:count??0}}
 export async function loadNotificationLogs(gymId:string,page:number,pageSize:number){const{data,error,count}=await requireClient().from('notification_logs').select('*,notifications!inner(gym_id,notification_type,channel,member_id,members(name,member_id))',{count:'exact'}).eq('notifications.gym_id',gymId).order('attempt_at',{ascending:false}).range(page*pageSize,page*pageSize+pageSize-1);if(error)throw error;return{rows:data??[],count:count??0}}
 export async function notificationCounts(gymId:string){return unwrap(await requireClient().rpc('get_notification_counts',{p_gym_id:gymId})) as {unread:number;queued:number;failed:number}}
