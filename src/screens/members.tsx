@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState}from'react';
-import{ArrowLeft,CalendarDays,CircleDollarSign,Edit3,MessageCircle,PauseCircle,Phone,Plus,RefreshCw,Search,Snowflake,Trash2,UserCheck,UserPlus}from'lucide-react';
+import{ArrowLeft,CalendarDays,CircleDollarSign,Edit3,MessageCircle,PauseCircle,Phone,Plus,RefreshCw,Search,Snowflake,Trash2,UserCheck,UserPlus,Check}from'lucide-react';
 import{cancelClassBooking,cancelMembership,checkoutAttendance,createMember,createOldMember,deleteMember,findMemberByPhone,freezeMembership,loadPaymentMethodSettings,loadMemberClassBookings,loadGym,localDateOffset,localToday,loadMemberDetail,loadMembers,loadPackages,loadStaff,money,recordAttendance,recordPayment,refundPayment,renewMembership,setMemberStatus,signedMemberPhoto,uploadMemberPhoto,date}from'../data';
 import type{Gym,Member,Package,Staff}from'../data';
 import{DataTable,Detail,Empty,Field,Metric,Pagination,Panel,PageHeader,Sheet,StatusTag,Summary,Toggle,humanError,initials}from'../components/ui';
@@ -20,7 +20,7 @@ export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:n
 export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAdmin:boolean;onClose:()=>void;onSaved:(memberId?:string)=>void}){
  const[packages,setPackages]=useState<Package[]>([]),[staff,setStaff]=useState<Staff[]>([]),[methods,setMethods]=useState<string[]>(METHODS),[gym,setGym]=useState<Gym|null>(null);
  const[dup,setDup]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[fieldErrors,setFieldErrors]=useState<Record<string,string>>({});
- const[saveState,setSaveState]=useState<'idle'|'saving'|'success'>('idle'),[savedMemberId,setSavedMemberId]=useState('');
+ const[saveState,setSaveState]=useState<'idle'|'saving'|'success'>('idle'),[saveStage,setSaveStage]=useState(''),[savedMemberId,setSavedMemberId]=useState(''),[photoWarning,setPhotoWarning]=useState('');
  const[f,setF]=useState<any>({
   name:'',phone:'',memberId:'',email:'',dob:'',gender:'',address:'',emergencyContact:'',emergencyPhone:'',
   joinDate:today(),status:'active',coach:'',allowDuplicate:false,
@@ -115,19 +115,19 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   setFieldErrors(e);return Object.keys(e).length===0;
  };
  const save=async(e:React.FormEvent)=>{
-  e.preventDefault();setError('');
+  e.preventDefault();setError('');setPhotoWarning('');
   if(saveState==='saving')return;
   if(!validate()){setError('Please fix the highlighted fields before importing this member.');return}
-  setBusy(true);setSaveState('saving');
+  setBusy(true);setSaveState('saving');setSaveStage('Creating member record…');
   try{
    const id=await createOldMember({gymId,name:f.name,phone:f.phone,memberId:f.memberId||null,email:f.email||null,dob:f.dob||null,gender:f.gender||null,address:f.address||null,emergencyContact:f.emergencyContact||null,emergencyPhone:f.emergencyPhone||null,joinDate:f.joinDate,status:f.status,assignedCoachId:f.coach||null,allowDuplicatePhone:f.allowDuplicate,addMembership:f.addMembership,packageId:f.packageId||null,membershipStartDate:f.addMembership?f.membershipStart:null,membershipEndDate:f.addMembership?f.membershipEnd:null,membershipStatus:f.membershipStatus,price:f.addMembership?Number(f.price):null,durationMonths:f.addMembership?Number(f.duration):null,discount:f.addMembership?Number(f.discount):0,amountPaid:f.addMembership?Number(f.amountPaid):0,paymentMethod:f.paymentMethod,paymentDate:f.addMembership&&Number(f.amountPaid)>0?f.paymentDate:null,transactionReference:f.addMembership&&Number(f.amountPaid)>0?(f.reference||null):null,paymentNotes:f.addMembership&&Number(f.amountPaid)>0?(f.paymentNotes||null):null});
-   if(f.photo)await uploadMemberPhoto(gymId,id,f.photo);
-   setSavedMemberId(id);setSaveState('success');setBusy(false);setFieldErrors({});
-  }catch(x:any){setBusy(false);setSaveState('idle');setError(humanError(x))}
+   if(f.photo){setSaveStage('Uploading profile photo…');try{await uploadMemberPhoto(gymId,id,f.photo)}catch{x){setPhotoWarning('Member imported, but the profile photo could not be uploaded. You can add it later from the member profile.')}}}
+   setSaveStage('Import complete');setSavedMemberId(id);setSaveState('success');setBusy(false);setFieldErrors({});
+  }catch(x:any){setBusy(false);setSaveState('idle');setSaveStage('');setError(humanError(x))}
  };
  const duplicateBlocked=dup.length>0&&!(isAdmin&&f.allowDuplicate),noMethods=f.addMembership&&Number(f.amountPaid)>0&&!methods.length;
- if(saveState==='success')return <Sheet title="Import complete" onClose={onClose}><div className="old-member-success"><div className="success-icon"><Check size={26}/></div><h3>Member imported successfully</h3><p>The old member record has been created with the historical information you entered.</p><div className="success-summary"><Summary title="Member ID" value={savedMemberId||'Generated'}/><Summary title="Membership" value={f.addMembership?(f.membershipEnd?date(f.membershipEnd):'Added'):'Not added'}/><Summary title="Payment" value={f.addMembership&&Number(f.amountPaid)>0?money(Number(f.amountPaid)):'No payment'}/></div><button className="primary full" onClick={()=>onSaved(savedMemberId)}>Done</button></div></Sheet>;
- return <Sheet title="Import old member" onClose={()=>{if(!busy)onClose()}}><form className="form old-member-form" onSubmit={save}>
+ if(saveState==='success')return <Sheet title="Import complete" onClose={onClose}><div className="old-member-success"><div className="success-icon"><Check size={26}/></div><div className="success-kicker">DONE</div><h3>Member imported successfully</h3><p>The member record and selected historical details are now saved.</p>{photoWarning&&<div className="success-warning" role="status"><b>One small issue</b><span>{photoWarning}</span></div>}<div className="success-summary"><Summary title="Member ID" value={savedMemberId||'Generated'}/><Summary title="Membership" value={f.addMembership?(f.membershipEnd?date(f.membershipEnd):'Added'):'Not added'}/><Summary title="Payment" value={f.addMembership&&Number(f.amountPaid)>0?money(Number(f.amountPaid)):'No payment'}/></div><button className="primary full" onClick={()=>onSaved(savedMemberId)}>Done — open member</button></div></Sheet>;
+ return <Sheet title="Import old member" onClose={()=>{if(!busy)onClose()}}><form className="form old-member-form" noValidate onSubmit={save}>
   <div className="old-member-intro"><div><b>Bring an existing member into FitCore</b><span>Use this flow for members who joined before the software. Historical membership and payment dates stay intact.</span></div><small>Required: name, mobile and joining date. Membership is optional.</small></div>
   {error&&<div className="import-alert" role="alert"><b>Import needs attention</b><span>{error}</span></div>}
   <div className="form-section">
@@ -181,8 +181,8 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
    </div>}
   </div>
   <div className="import-savebar">
-   <div className="save-state"><span className={saveState==='saving'?'saving-dot':saveState==='success'?'success-dot':''}></span><div><b>{saveState==='saving'?'Saving secure record…':'Ready to import'}</b><small>{saveState==='saving'?'Please keep this window open while the member and history are being saved.':noMethods?'A payment method is required for a paid import.':'Review the details, then import this member.'}</small></div></div>
-   <div className="form-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="primary import-submit" disabled={busy||duplicateBlocked||noMethods}>{busy?'Saving…':noMethods?'Enable a payment method first':'Import old member'}</button></div>
+   <div className="save-state"><span className={saveState==='saving'?'saving-dot':saveState==='success'?'success-dot':''}></span><div><b>{saveState==='saving'?'Saving…':'Ready to import'}</b><small>{saveState==='saving'?(saveStage||'Please keep this window open while your record is being saved.'):(noMethods?'A payment method is required for a paid import.':'Review the details, then import this member.')}</small></div></div>
+   <div className="form-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="primary import-submit" disabled={busy||duplicateBlocked||noMethods}>{busy?<><span className="button-spinner"/>Saving…</>:noMethods?'Enable a payment method first':'Import old member'}</button></div>
   </div>
  </form></Sheet>
 }
