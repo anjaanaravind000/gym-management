@@ -135,9 +135,11 @@ export function money(value:number,currency='INR'){return new Intl.NumberFormat(
 export function date(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value+'T00:00:00')):'—'}
 export function dateTime(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—'}
 
-export async function inviteStaff(args:{gymId:string;email:string;name:string;phone?:string;role:'coach'|'staff';redirectTo:string}){
- const {data,error}=await requireClient().functions.invoke('invite-staff',{body:args});
- if(error)throw error;if(data?.error)throw new Error(data.error);return data;
+export async function inviteStaff(args:{gymId:string;email?:string;name:string;phone?:string;role:'coach'|'staff';username:string;password:string}){
+ return unwrap(await requireClient().rpc('create_staff_account',{
+   p_gym_id:args.gymId,p_name:args.name,p_username:args.username,p_password:args.password,
+   p_email:args.email??null,p_phone:args.phone??null,p_role:args.role
+ })) as string;
 }
 export async function sendWhatsapp(notificationId:string){
  const {data,error}=await requireClient().functions.invoke('send-whatsapp',{body:{notification_id:notificationId}});
