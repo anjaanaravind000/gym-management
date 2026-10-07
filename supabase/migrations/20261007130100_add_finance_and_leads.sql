@@ -46,6 +46,9 @@ create index if not exists leads_gym_status_idx on public.leads(gym_id, status, 
 create index if not exists leads_gym_follow_up_idx on public.leads(gym_id, follow_up_date);
 create index if not exists leads_assigned_to_idx on public.leads(assigned_to);
 create index if not exists leads_phone_idx on public.leads(gym_id, phone);
+create index if not exists leads_converted_member_id_idx on public.leads(converted_member_id);
+create index if not exists leads_created_by_idx on public.leads(created_by);
+create index if not exists leads_interested_package_id_idx on public.leads(interested_package_id);
 alter table public.leads enable row level security;
 grant select on public.leads to anon, authenticated;
 drop policy if exists leads_select on public.leads;
