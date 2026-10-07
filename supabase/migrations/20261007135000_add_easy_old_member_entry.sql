@@ -54,6 +54,8 @@ declare
   v_tz text;
   v_today date;
   v_membership_status membership_status;
+  v_payment_notes text := nullif(trim(p_payment_notes),'');
+  v_transaction_reference text := nullif(trim(p_transaction_reference),'');
 begin
   if not private.has_permission(p_gym_id, 'members.create') then raise exception 'Unauthorized'; end if;
   if length(trim(p_name)) < 2 then raise exception 'Please enter a valid member name'; end if;
@@ -67,6 +69,15 @@ begin
   if p_assigned_coach_id is not null and not exists(
     select 1 from public.users where id=p_assigned_coach_id and gym_id=p_gym_id and status='active'
   ) then raise exception 'Invalid assigned coach'; end if;
+
+  if not p_add_membership and (
+    coalesce(p_amount_paid,0) <> 0
+    or p_payment_date is not null
+    or nullif(trim(p_transaction_reference),'') is not null
+    or nullif(trim(p_payment_notes),'') is not null
+  ) then
+    raise exception 'Payment details cannot be added without a membership';
+  end if;
 
   v_mid := case when nullif(trim(p_member_id),'') is null then private.generate_member_id(p_gym_id) else trim(p_member_id) end;
 
@@ -108,6 +119,9 @@ begin
     if p_membership_start_date is null or p_membership_end_date is null then
       raise exception 'Membership start date and end date are required';
     end if;
+    if p_membership_start_date < p_join_date then
+      raise exception 'Membership start date cannot be before joining date';
+    end if;
     if p_membership_end_date < p_membership_start_date then
       raise exception 'Membership end date cannot be before the start date';
     end if;
@@ -121,6 +135,34 @@ begin
     select timezone into v_tz from public.gyms where id=p_gym_id;
     if v_tz is null then raise exception 'Gym timezone is not configured'; end if;
     v_today := (now() at time zone v_tz)::date;
+
+    if p_amount_paid > 0 then
+      if p_payment_date is null then
+        raise exception 'Payment date is required when an amount is recorded';
+      end if;
+      if p_payment_date > v_today then
+        raise exception 'Payment date cannot be in the future';
+      end if;
+      if p_payment_date < p_membership_start_date then
+        raise exception 'Payment date cannot be before the membership start date';
+      end if;
+      if not exists(
+        select 1 from public.payment_method_settings
+        where gym_id=p_gym_id and payment_method=p_payment_method and enabled
+      ) then
+        raise exception 'Selected payment method is disabled';
+      end if;
+    else
+      if p_payment_date is not null
+        or nullif(trim(p_transaction_reference),'') is not null
+        or nullif(trim(p_payment_notes),'') is not null then
+        raise exception 'Payment details require an amount paid';
+      end if;
+    end if;
+
+    v_final := greatest(v_price-coalesce(p_discount,0),0);
+    if p_amount_paid > v_final then raise exception 'Amount paid cannot exceed final amount'; end if;
+    if p_membership_status not in ('active','cancelled') then raise exception 'Imported membership status must be Active or Cancelled'; end if;
 
     if p_membership_status='cancelled' or p_status='cancelled' then
       v_membership_status := 'cancelled'::membership_status;
@@ -148,9 +190,9 @@ begin
     returning id into v_membership;
 
     if p_amount_paid > 0 then
-      if nullif(trim(p_transaction_reference),'') is not null and exists(
+      if v_transaction_reference is not null and exists(
         select 1 from public.payments
-        where gym_id=p_gym_id and transaction_reference=trim(p_transaction_reference)
+        where gym_id=p_gym_id and transaction_reference=v_transaction_reference
           and status not in ('refunded','reversed')
       ) then raise exception 'Transaction reference already exists'; end if;
 
@@ -160,9 +202,9 @@ begin
       )
       values(
         p_gym_id,v_member,v_membership,p_amount_paid,p_payment_method,
-        nullif(trim(p_transaction_reference),''),p_payment_notes,
+        v_transaction_reference,v_payment_notes,
         private.current_app_user_id(),'paid',
-        (coalesce(p_payment_date,p_join_date)::timestamp at time zone v_tz)
+        (p_payment_date::timestamp at time zone v_tz)
       );
     end if;
   end if;
