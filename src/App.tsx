@@ -6,7 +6,7 @@ import type{Member,Payment,UserProfile}from'./data';
 import{Brand,humanError}from'./components/ui';
 import{AuthScreen,SetupScreen}from'./components/auth';
 import{Dashboard}from'./screens/dashboard';
-import{Members,MemberForm,MemberProfile}from'./screens/members';
+import{Members,MemberForm,OldMemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
 import{Finance}from'./screens/finance';
@@ -52,6 +52,7 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
  <nav className="mobile-nav"><button className={screen==='dashboard'?'selected':''} onClick={()=>setScreen('dashboard')}><Home size={18}/><span>Home</span></button><button className={screen==='members'?'selected':''} onClick={()=>setScreen('members')}><Users size={18}/><span>Members</span></button><button className={screen==='attendance'?'selected':''} onClick={()=>setScreen('attendance')}><Check size={18}/><span>Attend</span></button><button className={screen==='payments'?'selected':''} onClick={()=>setScreen('payments')}><WalletCards size={18}/><span>Payments</span></button><button className={more?'selected':''} onClick={()=>setMore(true)}><MoreHorizontal size={18}/><span>More</span></button></nav>{more&&<Sheet title="More" onClose={()=>setMore(false)}><div className="mobile-more-grid">{nav.filter(n=>!['dashboard','members','attendance','payments'].includes(n.id)).map(n=>{const I=n.icon;return <button key={n.id} className="quick" onClick={()=>{setMore(false);setScreen(n.id)}}><span><I size={19}/></span><b>{n.label}</b></button>})}</div></Sheet>}
+ {modal?.type==='old'&&<OldMemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={()=>{close();bump();toast('Old member added')}}/>}
  {modal?.type==='add'&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={()=>{close();bump();toast('Member created')}}/>}
  {modal?.type==='convert_lead'&&modal.lead&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} prefill={{name:modal.lead.name,phone:modal.lead.phone||'',email:modal.lead.email||'',packageId:modal.lead.interested_package_id||'',coach:modal.lead.assigned_to||'',notes:'Converted from CRM lead'}} onClose={close} onSaved={async memberId=>{if(!memberId)return;try{const{convertLead}=await import('./data');await convertLead(profile.gym_id,modal.lead.id,memberId);close();bump();toast('Lead converted to member')}catch(e:any){setError(humanError(e))}}}/>}
  {modal?.type==='class_book'&&<ClassBookingForm gymId={profile.gym_id} member={modal.member} session={modal.session} onClose={close} onSaved={()=>{close();bump();toast('Class booking updated')}}/>}
