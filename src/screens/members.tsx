@@ -66,10 +66,18 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
  const final=Math.max(Number(f.price||0)-Number(f.discount||0),0);
  const balance=Math.max(final-Number(f.amountPaid||0),0);
  const graceDays=gym?.renewal_grace_days??7;
+ const gymToday=useMemo(()=>{
+  if(!gym?.timezone)return today();
+  try{
+   const parts=new Intl.DateTimeFormat('en',{timeZone:gym.timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+   const get=(type:string)=>parts.find(x=>x.type===type)?.value||'';
+   return `${get('year')}-${get('month')}-${get('day')}`;
+  }catch{return today()}
+ },[gym?.timezone]);
  const derivedStatus=useMemo(()=>{
   if(!f.addMembership||!f.membershipStart||!f.membershipEnd)return null;
   if(f.membershipStatus==='cancelled'||f.status==='cancelled')return 'cancelled';
-  const t=today(),end=new Date(f.membershipEnd+'T12:00:00'),todayDate=new Date(t+'T12:00:00');
+  const t=gymToday,end=new Date(f.membershipEnd+'T12:00:00'),todayDate=new Date(t+'T12:00:00');
   const days=Math.round((end.getTime()-todayDate.getTime())/86400000);
   if(f.membershipStart>t)return 'active';
   if(days<0)return (todayDate.getTime()-end.getTime())/86400000<=graceDays?'grace_period':'did_not_renew';
@@ -125,7 +133,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
    <div className="form-grid">
     <Field label="Full name *"><input required maxLength={100} autoFocus value={f.name} onChange={e=>setF((o:any)=>({...o,name:e.target.value}))}/></Field>
     <Field label="Mobile *"><input required maxLength={20} inputMode="tel" pattern="[0-9+][0-9 ()-]{7,19}" title="Enter a valid mobile number" value={f.phone} onBlur={blurPhone} onChange={e=>{setDup([]);setF((o:any)=>({...o,phone:e.target.value,allowDuplicate:false}))}}/></Field>
-    <Field label="Joining date *"><input required type="date" max={today()} value={f.joinDate} onChange={e=>changeJoinDate(e.target.value)}/><small className="field-help">Original gym joining date.</small></Field>
+    <Field label="Joining date *"><input required type="date" max={gymToday} value={f.joinDate} onChange={e=>changeJoinDate(e.target.value)}/><small className="field-help">Original gym joining date.</small></Field>
     <Field label="Old Member ID"><input maxLength={40} placeholder="Leave blank to generate" value={f.memberId} onChange={e=>setF((o:any)=>({...o,memberId:e.target.value}))}/></Field>
     <Field label="Member status"><select value={f.status} onChange={e=>setF((o:any)=>({...o,status:e.target.value}))}><option value="active">Active</option><option value="inactive">Inactive</option><option value="cancelled">Cancelled</option></select></Field>
     <Field label="Assigned coach"><select value={f.coach} onChange={e=>setF((o:any)=>({...o,coach:e.target.value}))}><option value="">Unassigned</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
@@ -135,7 +143,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
     <summary>Additional member information <span>Optional</span></summary>
     <div className="form-grid">
      <Field label="Email"><input type="email" maxLength={255} value={f.email} onChange={e=>setF((o:any)=>({...o,email:e.target.value}))}/></Field>
-     <Field label="Date of birth"><input type="date" max={today()} value={f.dob} onChange={e=>setF((o:any)=>({...o,dob:e.target.value}))}/></Field>
+     <Field label="Date of birth"><input type="date" max={gymToday} value={f.dob} onChange={e=>setF((o:any)=>({...o,dob:e.target.value}))}/></Field>
      <Field label="Gender"><select value={f.gender} onChange={e=>setF((o:any)=>({...o,gender:e.target.value}))}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
      <Field label="Emergency contact"><input maxLength={100} value={f.emergencyContact} onChange={e=>setF((o:any)=>({...o,emergencyContact:e.target.value}))}/></Field>
      <Field label="Emergency phone"><input maxLength={20} inputMode="tel" value={f.emergencyPhone} onChange={e=>setF((o:any)=>({...o,emergencyPhone:e.target.value}))}/></Field>
@@ -155,7 +163,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
      <button type="button" className={!f.packageId?'package-choice selected':'package-choice'} onClick={()=>setF((o:any)=>({...o,packageId:'',membershipEnd:o.membershipEnd&&o.membershipEnd>=o.membershipStart?o.membershipEnd:o.membershipStart}))}><b>Custom / other</b><span>Enter your own price</span><small>No package required</small></button>
     </div></div>
     <div className="form-grid">
-     <Field label="Membership start *"><input required type="date" min={f.joinDate} max={today()} value={f.membershipStart} onChange={e=>changeMembershipStart(e.target.value)}/><small className="field-help">Must be today or earlier for an imported current membership.</small></Field>
+     <Field label="Membership start *"><input required type="date" min={f.joinDate} max={gymToday} value={f.membershipStart} onChange={e=>changeMembershipStart(e.target.value)}/><small className="field-help">Must be today or earlier for an imported current membership.</small></Field>
      <Field label="Membership expiry *"><input required type="date" min={f.membershipStart} value={f.membershipEnd} onChange={e=>setF((o:any)=>({...o,membershipEnd:e.target.value}))}/></Field>
      {selectedPackage&&<Field label="Price"><input type="number" min="0" step="0.01" value={f.price} onChange={e=>{const price=Math.max(0,Number(e.target.value)||0);setF((o:any)=>({...o,price,discount:Math.min(Number(o.discount||0),price),amountPaid:Math.min(Number(o.amountPaid||0),Math.max(price-Number(o.discount||0),0))}))}}/><small className="field-help">Defaults to the package price; change it for historical pricing.</small></Field>}
      {!selectedPackage&&<Field label="Custom price *"><input required type="number" min="0" step="0.01" value={f.price} onChange={e=>{const price=Math.max(0,Number(e.target.value)||0);setF((o:any)=>({...o,price,discount:Math.min(Number(o.discount||0),price),amountPaid:Math.min(Number(o.amountPaid||0),Math.max(price-Number(o.discount||0),0))}))}}/></Field>}
@@ -171,7 +179,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
      <div className="payment-block-head"><div><b>Historical payment</b><span>Record the amount already collected for this membership.</span></div></div>
      {!methods.length&&<div className="warning-card"><b>No payment methods enabled</b><span>Enable at least one payment method in Settings before recording a historical payment.</span></div>}
      <div className="form-grid">
-      <Field label="Payment date *"><input type="date" min={f.joinDate} max={today()} required value={f.paymentDate} onChange={e=>setF((o:any)=>({...o,paymentDate:e.target.value}))}/><small className="field-help">Can be before the membership start when the member prepaid.</small></Field>
+      <Field label="Payment date *"><input type="date" min={f.joinDate} max={gymToday} required value={f.paymentDate} onChange={e=>setF((o:any)=>({...o,paymentDate:e.target.value}))}/><small className="field-help">Can be before the membership start when the member prepaid.</small></Field>
       <Field label="Payment method *"><select required disabled={!methods.length} value={f.paymentMethod} onChange={e=>setF((o:any)=>({...o,paymentMethod:e.target.value}))}>{methods.map(x=><option key={x}>{String(x).replaceAll('_',' ')}</option>)}</select></Field>
       <Field label="Transaction reference"><input maxLength={120} value={f.reference} onChange={e=>setF((o:any)=>({...o,reference:e.target.value}))}/></Field>
      </div>
