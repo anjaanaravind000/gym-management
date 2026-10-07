@@ -68,7 +68,7 @@ export function Classes({gymId,refresh,onBookMember}:{gymId:string;refresh:numbe
     <button className="secondary small" onClick={()=>setWeek(toWeekStart(localToday()))}>This week</button>
     <button className="icon-button" title="Next week" onClick={()=>setWeek(localDateOffset(week,7))}><ChevronRight size={17}/></button>
     <button className="icon-button" title="Refresh" onClick={load}><RefreshCw size={17}/></button>
-    <button className="primary" onClick={()=>setEditingSession({id:null,classId:classes.find(c=>c.status==='active')?.id||'',instructorId:staff.find(s=>s.status==='active')?.id||'',startLocal:week+'T09:00',endLocal:week+'T10:00',capacity:'',repeatWeeks:1})}><Plus size={16}/> Schedule</button>
+    <button className="primary class-schedule-btn" onClick={()=>setEditingSession({id:null,classId:classes.find(c=>c.status==='active')?.id||'',instructorId:staff.find(s=>s.status==='active')?.id||'',startLocal:week+'T09:00',endLocal:week+'T10:00',capacity:'',repeatWeeks:1})}><Plus size={16}/> Schedule</button>
    </div>}
   />
   {error&&<div className="error-banner">{error}</div>}
