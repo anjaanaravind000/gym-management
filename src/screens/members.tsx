@@ -11,10 +11,31 @@ const addDay=localDateOffset;
 export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:number;onRefresh:()=>void;onOpen:(x:any)=>void}){
  const[q,setQ]=useState(''),[status,setStatus]=useState('all'),[payment,setPayment]=useState('all'),[page,setPage]=useState(0),[data,setData]=useState<Member[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');const size=20;
  useEffect(()=>{let a=true;setBusy(true);loadMembers({gymId,page,pageSize:size,q,status,paymentStatus:payment}).then(r=>a&&(setData(r.rows),setCount(r.count),setError(''))).catch((x:any)=>a&&setError(humanError(x))).finally(()=>a&&setBusy(false));return()=>{a=false}},[gymId,page,q,status,payment,refresh]);
- return <><PageHeader title="Members" subtitle={count+' live members'} action={<div className="toolbar-actions"><button className="primary" onClick={()=>onOpen('add')}><Plus size={17}/> Add member</button><button className="icon-button" onClick={onRefresh}><RefreshCw size={18}/></button></div>}/>
+ return <><PageHeader title="Members" subtitle={count+' live members'} action={<div className="toolbar-actions"><button className="secondary" onClick={()=>onOpen('old')}><UserPlus size={17}/> Add old member</button><button className="primary" onClick={()=>onOpen('add')}><Plus size={17}/> Add member</button><button className="icon-button" onClick={onRefresh}><RefreshCw size={18}/></button></div>}/>
  {error&&<div className="error-banner">{error}<button onClick={()=>setError('')}>Dismiss</button></div>}<div className="filters-row"><div className="search-box"><Search size={18}/><input value={q} onChange={e=>{setQ(e.target.value);setPage(0)}} placeholder="Search name, mobile or Member ID"/></div><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">All statuses</option>{['active','expiring_soon','grace_period','did_not_renew','expired','frozen','cancelled','inactive'].map(x=><option key={x}>{x}</option>)}</select><select value={payment} onChange={e=>{setPayment(e.target.value);setPage(0)}}><option value="all">Any payment</option><option value="paid">Paid</option><option value="partially_paid">Partially paid</option><option value="pending">Pending</option></select></div>
  <div className="member-list">{data.map(m=><button className="member-card" key={m.id} onClick={()=>onOpen({type:'profile',member:m})}><div className="avatar member-avatar">{initials(m.name)}</div><div className="member-main"><b>{m.name}</b><span>#{m.member_id} · {m.phone}</span><div><StatusTag value={m.membership_status||m.member_status}/><span className="member-package">{m.package_name||'Custom'} · {m.end_date||'No expiry'}</span></div></div><span className="member-balance">{m.balance_amount>0?money(m.balance_amount):'Paid'}</span></button>)}</div>
- {!busy&&!data.length&&<Empty title={q?'No matching members':'No members yet'} text={q?'Try another search or filter.':'Your database is empty. Add the first member.'} action={<button className="secondary" onClick={()=>onOpen('add')}><UserPlus size={16}/> Add member</button>}/>}
+ {!busy&&!data.length&&<Empty title={q?'No matching members':'No members yet'} text={q?'Try another search or filter.':'Your database is empty. Add the first member.'} action={<button className="secondary" onClick={()=>onOpen('add')}><UserPlus size={16}/> Add member</bexport function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAdmin:boolean;onClose:()=>void;onSaved:(memberId?:string)=>void}){
+ const[f,setF]=useState({name:'',phone:'',memberId:'',joinDate:today(),status:'active',allowDuplicate:false});
+ const[dup,setDup]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const blur=async()=>{if(!f.phone.trim())return;try{setDup(await findMemberByPhone(gymId,f.phone.trim()))}catch{}};
+ const save=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);setError('');try{const id=await createOldMember({gymId,name:f.name,phone:f.phone,memberId:f.memberId||null,joinDate:f.joinDate,status:f.status,allowDuplicatePhone:f.allowDuplicate});onSaved(id)}catch(x:any){setError(humanError(x))}finally{setBusy(false)}};
+ return <Sheet title="Add old member" onClose={onClose}><form className="form" onSubmit={save}>
+  <div className="form-section"><h3>Historical member</h3><p className="form-help">Use this for members who joined before the software. No package, membership dates, or payment details are required.</p>
+   <div className="form-grid">
+    <Field label="Full name *"><input required autoFocus value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field>
+    <Field label="Mobile *"><input required inputMode="tel" value={f.phone} onBlur={blur} onChange={e=>setF({...f,phone:e.target.value})}/></Field>
+    <Field label="Old Member ID"><input placeholder="Leave blank to generate one" value={f.memberId} onChange={e=>setF({...f,memberId:e.target.value})}/></Field>
+    <Field label="Joining date"><input required type="date" value={f.joinDate} onChange={e=>setF({...f,joinDate:e.target.value})}/></Field>
+    <Field label="Status"><select value={f.status} onChange={e=>setF({...f,status:e.target.value})}><option value="active">Active</option><option value="inactive">Inactive</option><option value="cancelled">Cancelled</option></select></Field>
+   </div>
+   {dup.length>0&&<div className="warning-card"><b>Existing member found</b><span>{dup.map(x=>x.name+' · #'+x.member_id).join(' | ')}</span>{isAdmin&&<label><input type="checkbox" checked={f.allowDuplicate} onChange={e=>setF({...f,allowDuplicate:e.target.checked})}/> Continue with duplicate mobile</label>}</div>}
+  </div>
+  {error&&<div className="error-inline">{error}</div>}
+  <button className="primary full" disabled={busy}>{busy?'Adding…':'Add old member'}</button>
+ </form></Sheet>
+}
+
+utton>}/>}
  <Pagination page={page} pages={Math.max(1,Math.ceil(count/size))} onPage={setPage}/></>
 }
 
