@@ -166,3 +166,15 @@ grant execute on function public.void_expense(uuid,uuid,text) to anon,authentica
 grant execute on function public.save_lead(uuid,uuid,text,text,text,text,text,uuid,uuid,date,text,text) to anon,authenticated;
 grant execute on function public.delete_lead(uuid,uuid) to anon,authenticated;
 grant execute on function public.get_finance_summary(uuid,date,date) to anon,authenticated;
+
+create or replace function public.convert_lead(p_gym_id uuid,p_lead_id uuid,p_member_id uuid) returns void
+language plpgsql security definer set search_path to 'public','private','pg_catalog' as $$
+begin
+  if not private.has_permission(p_gym_id,'leads.manage') then raise exception 'Unauthorized'; end if;
+  if not exists(select 1 from public.leads where id=p_lead_id and gym_id=p_gym_id) then raise exception 'Lead not found'; end if;
+  if not exists(select 1 from public.members where id=p_member_id and gym_id=p_gym_id) then raise exception 'Member not found'; end if;
+  update public.leads set status='won',converted_member_id=p_member_id,updated_at=now()
+    where id=p_lead_id and gym_id=p_gym_id and status not in ('won','lost');
+  if not found then raise exception 'Lead is already closed'; end if;
+end $$;
+grant execute on function public.convert_lead(uuid,uuid,uuid) to anon,authenticated;
