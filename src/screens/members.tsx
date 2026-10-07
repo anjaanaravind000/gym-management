@@ -181,7 +181,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
    </div>}
   </div>
   <div className="import-savebar">
-   <div className="save-state"><span className={saveState==='saving'?'saving-dot':saveState==='success'?'success-dot':''}></span><div><b>{saveState==='saving'?'Saving…':'Ready to import'}</b><small>{saveState==='saving'?(saveStage||'Please keep this window open while your record is being saved.'):(noMethods?'A payment method is required for a paid import.':'Review the details, then import this member.')}</small></div></div>
+   <div className="save-state"><span className={saveState==='saving'?'saving-dot':''}></span><div><b>{saveState==='saving'?'Saving…':'Ready to import'}</b><small>{saveState==='saving'?(saveStage||'Please keep this window open while your record is being saved.'):(noMethods?'A payment method is required for a paid import.':'Review the details, then import this member.')}</small></div></div>
    <div className="form-actions"><button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancel</button><button className="primary import-submit" disabled={busy||duplicateBlocked||noMethods}>{busy?<><span className="button-spinner"/>Saving…</>:noMethods?'Enable a payment method first':'Import old member'}</button></div>
   </div>
  </form></Sheet>
