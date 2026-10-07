@@ -311,3 +311,6 @@ th,td{border-bottom-color:#202a22}
 .danger-action:disabled{opacity:.55;cursor:not-allowed}
 .sort-button span{font-size:11px;opacity:.65}
 .sort-button:hover span,.sort-button:focus-visible span{opacity:1}
+
+.mobile-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mobile-more-grid .quick{width:100%;}
+@media(min-width:721px){.mobile-more-grid{display:none}}
