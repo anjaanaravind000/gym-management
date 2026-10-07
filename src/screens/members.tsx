@@ -35,7 +35,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   return toYmd(d);
  };
  useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId),loadPaymentMethodSettings(gymId)]).then(([p,s,ms])=>{
-   setPackages(p);setStaff(s);setMethods(ms.filter((x:any)=>x.enabled).map((x:any)=>x.payment_method));
+   setPackages(p);setStaff(s);const enabledMethods=ms.filter((x:any)=>x.enabled).map((x:any)=>x.payment_method);setMethods(enabledMethods);setF((old:any)=>({...old,paymentMethod:enabledMethods.includes(old.paymentMethod)?old.paymentMethod:(enabledMethods[0]||old.paymentMethod)}));
    setF((old:any)=>{
     const first=p.find((x:any)=>x.status==='active')||p[0];
     if(!first||old.packageId)return {...old,coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
