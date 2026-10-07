@@ -38,9 +38,6 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
  </form></Sheet>
 }
 
-utton>}/>}
- <Pagination page={page} pages={Math.max(1,Math.ceil(count/size))} onPage={setPage}/></>
-}
 
 export function MemberForm({gymId,isAdmin,onClose,onSaved,prefill}:{gymId:string;isAdmin:boolean;onClose:()=>void;onSaved:(memberId?:string)=>void;prefill?:any}){
  const[packages,setPackages]=useState<Package[]>([]),[staff,setStaff]=useState<Staff[]>([]),[methods,setMethods]=useState<string[]>(METHODS),[dup,setDup]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
