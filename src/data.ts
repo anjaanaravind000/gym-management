@@ -89,7 +89,23 @@ export async function savePackage(a:{gymId:string;packageId?:string|null;name:st
 export async function loadMembers(a:{gymId:string;page:number;pageSize:number;q?:string;status?:string;paymentStatus?:string}){let q=requireClient().from('member_report').select('*',{count:'exact'}).eq('gym_id',a.gymId);if(a.q?.trim())q=q.or(`name.ilike.%${a.q.trim()}%,member_id.ilike.%${a.q.trim()}%,phone.ilike.%${a.q.trim()}%`);if(a.status&&a.status!=='all'){if(a.status==='inactive')q=q.eq('member_status','inactive');else q=q.eq('membership_status',a.status).eq('member_status','active')}else q=q.eq('member_status','active');if(a.paymentStatus&&a.paymentStatus!=='all')q=q.eq('payment_status',a.paymentStatus);const{data,error,count}=await q.order('join_date',{ascending:false}).range(a.page*a.pageSize,a.page*a.pageSize+a.pageSize-1);if(error)throw error;return{rows:(data??[])as Member[],count:count??0}}
 export async function findMemberByPhone(gymId:string,phone:string){return unwrap(await requireClient().from('members').select('id,member_id,name,phone').eq('gym_id',gymId).eq('phone',phone).limit(10)) as any[]}
 export async function createMember(a:any){return unwrap(await requireClient().rpc('create_member_registration_v2',{p_gym_id:a.gymId,p_name:a.name,p_phone:a.phone,p_email:a.email??null,p_dob:a.dob??null,p_gender:a.gender??null,p_address:a.address??null,p_emergency_contact:a.emergencyContact??null,p_emergency_phone:a.emergencyPhone??null,p_member_id:a.memberId??null,p_package_id:a.packageId??null,p_duration_months:a.durationMonths??null,p_join_date:a.joinDate,p_start_date:a.startDate,p_price:a.price??null,p_discount:a.discount,p_amount_paid:a.amountPaid,p_payment_method:a.paymentMethod,p_transaction_reference:a.transactionReference??null,p_payment_notes:a.paymentNotes??null,p_manual_end_date:a.manualEndDate??null,p_assigned_coach_id:a.assignedCoachId??null,p_allow_duplicate_phone:a.allowDuplicatePhone??false})) as string}
-export async function createOldMember(a:{gymId:string;name:string;phone:string;memberId?:string|null;joinDate?:string;status?:string;allowDuplicatePhone?:boolean}){return unwrap(await requireClient().rpc('create_old_member',{p_gym_id:a.gymId,p_name:a.name,p_phone:a.phone,p_member_id:a.memberId??null,p_join_date:a.joinDate??localToday(),p_status:a.status??'active',p_allow_duplicate_phone:a.allowDuplicatePhone??false})) as string}
+export async function createOldMember(a:{
+ gymId:string;name:string;phone:string;memberId?:string|null;email?:string|null;dob?:string|null;gender?:string|null;address?:string|null;
+ emergencyContact?:string|null;emergencyPhone?:string|null;joinDate?:string;status?:string;assignedCoachId?:string|null;allowDuplicatePhone?:boolean;
+ addMembership?:boolean;packageId?:string|null;membershipStartDate?:string|null;membershipEndDate?:string|null;membershipStatus?:string;
+ price?:number|null;durationMonths?:number|null;discount?:number;amountPaid?:number;paymentMethod?:string;paymentDate?:string|null;
+ transactionReference?:string|null;paymentNotes?:string|null
+}){
+ return unwrap(await requireClient().rpc('create_old_member',{
+  p_gym_id:a.gymId,p_name:a.name,p_phone:a.phone,p_email:a.email??null,p_dob:a.dob??null,p_gender:a.gender??null,p_address:a.address??null,
+  p_emergency_contact:a.emergencyContact??null,p_emergency_phone:a.emergencyPhone??null,p_member_id:a.memberId??null,p_join_date:a.joinDate??localToday(),
+  p_status:a.status??'active',p_assigned_coach_id:a.assignedCoachId??null,p_allow_duplicate_phone:a.allowDuplicatePhone??false,
+  p_add_membership:a.addMembership??false,p_package_id:a.packageId??null,p_membership_start_date:a.membershipStartDate??null,
+  p_membership_end_date:a.membershipEndDate??null,p_membership_status:a.membershipStatus??'active',p_price:a.price??null,
+  p_duration_months:a.durationMonths??null,p_discount:a.discount??0,p_amount_paid:a.amountPaid??0,p_payment_method:(a.paymentMethod??'cash') as any,
+  p_payment_date:a.paymentDate??null,p_transaction_reference:a.transactionReference??null,p_payment_notes:a.paymentNotes??null
+ })) as string
+}
 export async function updateMember(gymId:string,memberId:string,patch:Record<string,unknown>){
  return unwrap(await requireClient().rpc('update_member_profile',{
    p_gym_id:gymId,p_member_id:memberId,p_name:patch.name,p_phone:patch.phone,p_email:patch.email??null,
