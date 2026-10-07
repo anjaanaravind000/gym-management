@@ -26,21 +26,6 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   addMembership:true,packageId:'',membershipStart:today(),membershipEnd:'',membershipStatus:'active',
   price:0,duration:1,discount:0,amountPaid:0,paymentMethod:'cash',paymentDate:today(),reference:'',paymentNotes:'',photo:null
  });
- useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId)]).then(([p,s])=>{
-   setPackages(p);setStaff(s);
-   setF((old:any)=>{
-    const first=p.find((x:any)=>x.status==='active')||p[0];
-    if(!first||old.packageId)return {...old,coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
-    return {...old,packageId:first.id,price:Number(first.price),duration:Number(first.duration_months),membershipEnd:calcEnd(old.membershipStart,first),coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
-   });
-  }).catch((x:any)=>setError(humanError(x)))},[gymId]);
- const calcEnd=(start:string,pkg?:Package)=>{
-  if(!start||!pkg)return '';
-  const d=new Date(start+'T12:00:00'),duration=Math.max(1,Number(pkg.duration_months||1)),original=d.getDate();
-  if(pkg.duration_unit==='day')d.setDate(d.getDate()+duration-1);
-  else{d.setMonth(d.getMonth()+duration);if(d.getDate()>=original)d.setDate(d.getDate()-1)}
-  return localToday.call(null as any);
- };
  const toYmd=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
  const packageEnd=(start:string,pkg?:Package)=>{
   if(!start||!pkg)return '';
@@ -49,6 +34,14 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   else{d.setMonth(d.getMonth()+duration);if(d.getDate()>=original)d.setDate(d.getDate()-1)}
   return toYmd(d);
  };
+ useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId)]).then(([p,s])=>{
+   setPackages(p);setStaff(s);
+   setF((old:any)=>{
+    const first=p.find((x:any)=>x.status==='active')||p[0];
+    if(!first||old.packageId)return {...old,coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
+    return {...old,packageId:first.id,price:Number(first.price),duration:Number(first.duration_months),membershipEnd:packageEnd(old.membershipStart,first),coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
+   });
+  }).catch((x:any)=>setError(humanError(x)))},[gymId]);
  const blur=async()=>{if(!f.phone.trim())return;try{setDup(await findMemberByPhone(gymId,f.phone.trim()))}catch{}};
  const selectedPackage=packages.find(x=>x.id===f.packageId);
  const final=Math.max(Number(f.price||0)-Number(f.discount||0),0),balance=Math.max(final-Number(f.amountPaid||0),0);
@@ -96,8 +89,8 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
     <Field label="Membership start *"><input required type="date" value={f.membershipStart} onChange={e=>{const start=e.target.value;setF({...f,membershipStart:start,membershipEnd:selectedPackage?packageEnd(start,selectedPackage):f.membershipEnd})}}/></Field>
     <Field label="Membership end *"><input required type="date" value={f.membershipEnd} onChange={e=>setF({...f,membershipEnd:e.target.value})}/></Field>
     <Field label="Membership status"><select value={f.membershipStatus} onChange={e=>setF({...f,membershipStatus:e.target.value})}><option value="active">Active / calculate from dates</option><option value="cancelled">Cancelled</option></select></Field>
-    {!selectedPackage&&<><Field label="Custom price *"><input required type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field><Field label="Duration (months) *"><input required type="number" min="1" value={f.duration} onChange={e=>setF({...f,duration:Number(e.target.value)})}/></Field></>}
-    <Field label="Price"><input type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field>
+    {!selectedPackage&&<Field label="Custom price *"><input required type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field>}
+    {selectedPackage&&<Field label="Price"><input type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field>}
     <Field label="Discount"><input type="number" min="0" step="0.01" value={f.discount} onChange={e=>setF({...f,discount:Number(e.target.value)})}/></Field>
     <Field label="Amount paid"><input type="number" min="0" max={final} step="0.01" value={f.amountPaid} onChange={e=>setF({...f,amountPaid:Number(e.target.value)})}/></Field>
    </div>
