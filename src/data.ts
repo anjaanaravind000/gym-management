@@ -152,11 +152,12 @@ export async function loadClasses(gymId:string,includeInactive=true){
 export async function saveClass(a:{gymId:string;id?:string|null;name:string;description?:string|null;durationMinutes:number;capacity:number;status?:string}){return unwrap(await requireClient().rpc('save_class',{
  p_gym_id:a.gymId,p_class_id:a.id??null,p_name:a.name,p_description:a.description??null,p_duration_minutes:a.durationMinutes,p_capacity:a.capacity,p_status:a.status??'active'
 })) as string}
-export async function loadClassTimetable(gymId:string,from:string,to:string,instructorId?:string,classId?:string){
- let q=requireClient().from('class_timetable_report').select('*').eq('gym_id',gymId).gte('start_at',from).lt('start_at',to).order('start_at');
- if(instructorId&&instructorId!=='all')q=q.eq('instructor_id',instructorId);
- if(classId&&classId!=='all')q=q.eq('class_id',classId);
- return unwrap(await q) as ClassSession[];
+export async function loadClassTimetable(gymId:string,fromLocal:string,toLocal:string,instructorId?:string,classId?:string){
+ return unwrap(await requireClient().rpc('get_class_timetable',{
+  p_gym_id:gymId,p_from_local:fromLocal,p_to_local:toLocal,
+  p_instructor_id:instructorId&&instructorId!=='all'?instructorId:null,
+  p_class_id:classId&&classId!=='all'?classId:null
+ })) as ClassSession[];
 }
 export async function saveClassSession(a:{gymId:string;id?:string|null;classId:string;instructorId:string;startLocal:string;endLocal:string;capacity?:number|null;repeatWeeks?:number}){return unwrap(await requireClient().rpc('save_class_session',{
  p_gym_id:a.gymId,p_session_id:a.id??null,p_class_id:a.classId,p_instructor_id:a.instructorId,p_start_local:a.startLocal,p_end_local:a.endLocal,p_capacity:a.capacity??null,p_repeat_weeks:a.repeatWeeks??1
