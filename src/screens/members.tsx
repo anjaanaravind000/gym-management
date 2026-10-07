@@ -18,20 +18,93 @@ export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:n
  <Pagination page={page} pages={Math.max(1,Math.ceil(count/20))} onPage={setPage}/>
  </>}
 export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAdmin:boolean;onClose:()=>void;onSaved:(memberId?:string)=>void}){
- const[f,setF]=useState({name:'',phone:'',memberId:'',joinDate:today(),status:'active',allowDuplicate:false});
+ const[packages,setPackages]=useState<Package[]>([]),[staff,setStaff]=useState<Staff[]>([]);
  const[dup,setDup]=useState<any[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const[f,setF]=useState<any>({
+  name:'',phone:'',memberId:'',email:'',dob:'',gender:'',address:'',emergencyContact:'',emergencyPhone:'',
+  joinDate:today(),status:'active',coach:'',
+  addMembership:true,packageId:'',membershipStart:today(),membershipEnd:'',membershipStatus:'active',
+  price:0,duration:1,discount:0,amountPaid:0,paymentMethod:'cash',paymentDate:today(),reference:'',paymentNotes:'',photo:null
+ });
+ useEffect(()=>{Promise.all([loadPackages(gymId,true),loadStaff(gymId)]).then(([p,s])=>{
+   setPackages(p);setStaff(s);
+   setF((old:any)=>{
+    const first=p.find((x:any)=>x.status==='active')||p[0];
+    if(!first||old.packageId)return {...old,coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
+    return {...old,packageId:first.id,price:Number(first.price),duration:Number(first.duration_months),membershipEnd:calcEnd(old.membershipStart,first),coach:s.some((x:any)=>x.id===old.coach&&x.status==='active')?old.coach:''};
+   });
+  }).catch((x:any)=>setError(humanError(x)))},[gymId]);
+ const calcEnd=(start:string,pkg?:Package)=>{
+  if(!start||!pkg)return '';
+  const d=new Date(start+'T12:00:00'),duration=Math.max(1,Number(pkg.duration_months||1)),original=d.getDate();
+  if(pkg.duration_unit==='day')d.setDate(d.getDate()+duration-1);
+  else{d.setMonth(d.getMonth()+duration);if(d.getDate()>=original)d.setDate(d.getDate()-1)}
+  return localToday.call(null as any);
+ };
+ const toYmd=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const packageEnd=(start:string,pkg?:Package)=>{
+  if(!start||!pkg)return '';
+  const d=new Date(start+'T12:00:00'),duration=Math.max(1,Number(pkg.duration_months||1)),original=d.getDate();
+  if(pkg.duration_unit==='day')d.setDate(d.getDate()+duration-1);
+  else{d.setMonth(d.getMonth()+duration);if(d.getDate()>=original)d.setDate(d.getDate()-1)}
+  return toYmd(d);
+ };
  const blur=async()=>{if(!f.phone.trim())return;try{setDup(await findMemberByPhone(gymId,f.phone.trim()))}catch{}};
- const save=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);setError('');try{const id=await createOldMember({gymId,name:f.name,phone:f.phone,memberId:f.memberId||null,joinDate:f.joinDate,status:f.status,allowDuplicatePhone:f.allowDuplicate});onSaved(id)}catch(x:any){setError(humanError(x))}finally{setBusy(false)}};
+ const selectedPackage=packages.find(x=>x.id===f.packageId);
+ const final=Math.max(Number(f.price||0)-Number(f.discount||0),0),balance=Math.max(final-Number(f.amountPaid||0),0);
+ const choosePackage=(value:string)=>{
+  const p=packages.find(x=>x.id===value);
+  setF((old:any)=>({...old,packageId:value,price:p?Number(p.price):0,duration:p?Number(p.duration_months):1,membershipEnd:p?packageEnd(old.membershipStart,p):old.membershipEnd}));
+ };
+ const save=async(e:React.FormEvent)=>{
+  e.preventDefault();setBusy(true);setError('');
+  try{
+   const id=await createOldMember({
+    gymId,name:f.name,phone:f.phone,memberId:f.memberId||null,email:f.email||null,dob:f.dob||null,gender:f.gender||null,address:f.address||null,
+    emergencyContact:f.emergencyContact||null,emergencyPhone:f.emergencyPhone||null,joinDate:f.joinDate,status:f.status,assignedCoachId:f.coach||null,
+    allowDuplicatePhone:f.allowDuplicate,addMembership:f.addMembership,packageId:f.packageId||null,membershipStartDate:f.addMembership?f.membershipStart:null,
+    membershipEndDate:f.addMembership?f.membershipEnd:null,membershipStatus:f.membershipStatus,price:f.addMembership?Number(f.price):null,
+    durationMonths:f.addMembership?Number(f.duration):null,discount:f.addMembership?Number(f.discount):0,amountPaid:f.addMembership?Number(f.amountPaid):0,
+    paymentMethod:f.paymentMethod,paymentDate:f.amountPaid>0?f.paymentDate:null,transactionReference:f.reference||null,paymentNotes:f.paymentNotes||null
+   });
+   if(f.photo)await uploadMemberPhoto(gymId,id,f.photo);
+   onSaved(id);
+  }catch(x:any){setError(humanError(x))}finally{setBusy(false)}
+ };
  return <Sheet title="Add old member" onClose={onClose}><form className="form" onSubmit={save}>
-  <div className="form-section"><h3>Historical member</h3><p className="form-help">Use this for members who joined before the software. No package, membership dates, or payment details are required.</p>
+  <div className="form-section"><h3>Member details</h3><p className="form-help">For members who joined before the software. Enter the details you already have; nothing unnecessary is required.</p>
    <div className="form-grid">
     <Field label="Full name *"><input required autoFocus value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field>
     <Field label="Mobile *"><input required inputMode="tel" value={f.phone} onBlur={blur} onChange={e=>setF({...f,phone:e.target.value})}/></Field>
-    <Field label="Old Member ID"><input placeholder="Leave blank to generate one" value={f.memberId} onChange={e=>setF({...f,memberId:e.target.value})}/></Field>
-    <Field label="Joining date"><input required type="date" value={f.joinDate} onChange={e=>setF({...f,joinDate:e.target.value})}/></Field>
-    <Field label="Status"><select value={f.status} onChange={e=>setF({...f,status:e.target.value})}><option value="active">Active</option><option value="inactive">Inactive</option><option value="cancelled">Cancelled</option></select></Field>
+    <Field label="Old Member ID"><input placeholder="Leave blank to generate" value={f.memberId} onChange={e=>setF({...f,memberId:e.target.value})}/></Field>
+    <Field label="Joining date"><input required type="date" value={f.joinDate} onChange={e=>setF({...f,joinDate:e.target.value,membershipStart:e.target.value,paymentDate:e.target.value})}/></Field>
+    <Field label="Email"><input type="email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></Field>
+    <Field label="DOB"><input type="date" value={f.dob} onChange={e=>setF({...f,dob:e.target.value})}/></Field>
+    <Field label="Gender"><select value={f.gender} onChange={e=>setF({...f,gender:e.target.value})}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></Field>
+    <Field label="Emergency contact"><input value={f.emergencyContact} onChange={e=>setF({...f,emergencyContact:e.target.value})}/></Field>
+    <Field label="Emergency phone"><input inputMode="tel" value={f.emergencyPhone} onChange={e=>setF({...f,emergencyPhone:e.target.value})}/></Field>
+    <Field label="Assigned coach"><select value={f.coach} onChange={e=>setF({...f,coach:e.target.value})}><option value="">Unassigned</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+    <Field label="Member status"><select value={f.status} onChange={e=>setF({...f,status:e.target.value})}><option value="active">Active</option><option value="inactive">Inactive</option><option value="cancelled">Cancelled</option></select></Field>
    </div>
+   <Field label="Address"><textarea value={f.address} onChange={e=>setF({...f,address:e.target.value})}/></Field>
+   <Field label="Profile photo (max 5 MB)"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{const file=e.target.files?.[0]||null;if(file&&file.size>5*1024*1024){setError('Profile photo must be 5 MB or smaller.');setF({...f,photo:null})}else{setError('');setF({...f,photo:file})}}}/></Field>
    {dup.length>0&&<div className="warning-card"><b>Existing member found</b><span>{dup.map(x=>x.name+' · #'+x.member_id).join(' | ')}</span>{isAdmin&&<label><input type="checkbox" checked={f.allowDuplicate} onChange={e=>setF({...f,allowDuplicate:e.target.checked})}/> Continue with duplicate mobile</label>}</div>}
+  </div>
+  <div className="form-section"><div className="section-title"><h3>Current membership</h3><label><input type="checkbox" checked={f.addMembership} onChange={e=>setF({...f,addMembership:e.target.checked})}/> Add membership</label></div>
+   {f.addMembership&&<><div className="form-grid">
+    <Field label="Package"><select value={f.packageId} onChange={e=>choosePackage(e.target.value)}><option value="">Custom / other</option>{packages.map(p=><option key={p.id} value={p.id}>{p.name}{p.status==='inactive'?' (Inactive)':''}</option>)}</select></Field>
+    <Field label="Membership start *"><input required type="date" value={f.membershipStart} onChange={e=>{const start=e.target.value;setF({...f,membershipStart:start,membershipEnd:selectedPackage?packageEnd(start,selectedPackage):f.membershipEnd})}}/></Field>
+    <Field label="Membership end *"><input required type="date" value={f.membershipEnd} onChange={e=>setF({...f,membershipEnd:e.target.value})}/></Field>
+    <Field label="Membership status"><select value={f.membershipStatus} onChange={e=>setF({...f,membershipStatus:e.target.value})}><option value="active">Active / calculate from dates</option><option value="cancelled">Cancelled</option></select></Field>
+    {!selectedPackage&&<><Field label="Custom price *"><input required type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field><Field label="Duration (months) *"><input required type="number" min="1" value={f.duration} onChange={e=>setF({...f,duration:Number(e.target.value)})}/></Field></>}
+    <Field label="Price"><input type="number" min="0" step="0.01" value={f.price} onChange={e=>setF({...f,price:Number(e.target.value)})}/></Field>
+    <Field label="Discount"><input type="number" min="0" step="0.01" value={f.discount} onChange={e=>setF({...f,discount:Number(e.target.value)})}/></Field>
+    <Field label="Amount paid"><input type="number" min="0" max={final} step="0.01" value={f.amountPaid} onChange={e=>setF({...f,amountPaid:Number(e.target.value)})}/></Field>
+   </div>
+   <div className="calculation"><Summary title="Price" value={money(Number(f.price||0))}/><Summary title="Final" value={money(final)}/><Summary title="Paid" value={money(Number(f.amountPaid||0))}/><Summary title="Balance" value={money(balance)}/></div>
+   {Number(f.amountPaid)>0&&<div className="form-grid"><Field label="Payment date"><input type="date" value={f.paymentDate} onChange={e=>setF({...f,paymentDate:e.target.value})}/></Field><Field label="Payment method"><select value={f.paymentMethod} onChange={e=>setF({...f,paymentMethod:e.target.value})}>{METHODS.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Reference"><input value={f.reference} onChange={e=>setF({...f,reference:e.target.value})}/></Field></div>}
+   <Field label="Membership / payment notes"><textarea value={f.paymentNotes} onChange={e=>setF({...f,paymentNotes:e.target.value})}/></Field>
+   </>}
   </div>
   {error&&<div className="error-inline">{error}</div>}
   <button className="primary full" disabled={busy}>{busy?'Adding…':'Add old member'}</button>
