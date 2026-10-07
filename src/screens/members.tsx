@@ -99,8 +99,8 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
    else if(f.membershipStart&&f.membershipEnd<f.membershipStart)e.membershipEnd='Expiry must be on or after the membership start.';
    const price=Number(f.price);
    if(selectedPackage===undefined){
-    if(!Number.isFinite(price)||price<0)e.price='Enter a valid membership price.';
-    const duration=Number(f.duration);if(!Number.isInteger(duration)||duration<=0)e.duration='Enter a valid whole-number duration in months.';
+    if(!String(f.price??'').trim()||!Number.isFinite(price)||price<0)e.price='Enter a valid membership price.';
+    const duration=Number(f.duration);if(!String(f.duration??'').trim()||!Number.isInteger(duration)||duration<=0)e.duration='Enter a valid whole-number duration in months.';
    }
    const discount=Number(f.discount||0),paid=Number(f.amountPaid||0);
    if(discount<0||discount>price)e.discount='Discount cannot be greater than the membership price.';
@@ -126,7 +126,7 @@ export function OldMemberForm({gymId,isAdmin,onClose,onSaved}:{gymId:string;isAd
   }catch(x:any){setBusy(false);setSaveState('idle');setSaveStage('');setError(humanError(x))}
  };
  const duplicateBlocked=dup.length>0&&!(isAdmin&&f.allowDuplicate),noMethods=f.addMembership&&Number(f.amountPaid)>0&&!methods.length;
- if(saveState==='success')return <Sheet title="Import complete" onClose={onClose}><div className="old-member-success"><div className="success-icon"><Check size={26}/></div><div className="success-kicker">DONE</div><h3>Member imported successfully</h3><p>The member record and selected historical details are now saved.</p>{photoWarning&&<div className="success-warning" role="status"><b>One small issue</b><span>{photoWarning}</span></div>}<div className="success-summary"><Summary title="Member ID" value={savedMemberId||'Generated'}/><Summary title="Membership" value={f.addMembership?(f.membershipEnd?date(f.membershipEnd):'Added'):'Not added'}/><Summary title="Payment" value={f.addMembership&&Number(f.amountPaid)>0?money(Number(f.amountPaid)):'No payment'}/></div><button className="primary full" onClick={()=>onSaved(savedMemberId)}>Done — open member</button></div></Sheet>;
+ if(saveState==='success')return <Sheet title="Import complete" onClose={()=>onSaved(savedMemberId)}><div className="old-member-success"><div className="success-icon"><Check size={26}/></div><div className="success-kicker">DONE</div><h3>Member imported successfully</h3><p>The member record and selected historical details are now saved.</p>{photoWarning&&<div className="success-warning" role="status"><b>One small issue</b><span>{photoWarning}</span></div>}<div className="success-summary"><Summary title="Member ID" value={savedMemberId||'Generated'}/><Summary title="Membership" value={f.addMembership?(f.membershipEnd?date(f.membershipEnd):'Added'):'Not added'}/><Summary title="Status" value={f.addMembership&&derivedStatus?<StatusTag value={derivedStatus}/>: '—'}/><Summary title="Payment" value={f.addMembership&&Number(f.amountPaid)>0?money(Number(f.amountPaid)):'No payment'}/></div><button className="primary full" onClick={()=>onSaved(savedMemberId)}>Done</button></div></Sheet>;
  return <Sheet title="Import old member" onClose={()=>{if(!busy)onClose()}}><form className="form old-member-form" noValidate onSubmit={save}>
   <div className="old-member-intro"><div><b>Bring an existing member into FitCore</b><span>Use this flow for members who joined before the software. Historical membership and payment dates stay intact.</span></div><small>Required: name, mobile and joining date. Membership is optional.</small></div>
   {error&&<div className="import-alert" role="alert"><b>Import needs attention</b><span>{error}</span></div>}
