@@ -1,12 +1,12 @@
 import React,{useEffect,useMemo,useState}from'react';
 import{ArrowLeft,CircleDollarSign,Edit3,MessageCircle,PauseCircle,Phone,Plus,RefreshCw,Search,Snowflake,Trash2,UserCheck,UserPlus}from'lucide-react';
-import{cancelMembership,checkoutAttendance,createMember,deleteMember,findMemberByPhone,freezeMembership,localToday,loadMemberDetail,loadMembers,loadPackages,loadStaff,money,recordAttendance,recordPayment,refundPayment,renewMembership,setMemberStatus,signedMemberPhoto,uploadMemberPhoto}from'../data';
+import{cancelMembership,checkoutAttendance,createMember,deleteMember,findMemberByPhone,freezeMembership,localDateOffset,localToday,loadMemberDetail,loadMembers,loadPackages,loadStaff,money,recordAttendance,recordPayment,refundPayment,renewMembership,setMemberStatus,signedMemberPhoto,uploadMemberPhoto}from'../data';
 import type{Member,Package,Staff}from'../data';
 import{DataTable,Detail,Empty,Field,Metric,Pagination,Panel,PageHeader,Sheet,StatusTag,Summary,Toggle,humanError,initials}from'../components/ui';
 
 const METHODS=['cash','upi','card','bank_transfer','cheque','other'];
 const today=localToday;
-const addDay=(s:string,n:number)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const addDay=localDateOffset;
 
 export function Members({gymId,refresh,onRefresh,onOpen}:{gymId:string;refresh:number;onRefresh:()=>void;onOpen:(x:any)=>void}){
  const[q,setQ]=useState(''),[status,setStatus]=useState('all'),[payment,setPayment]=useState('all'),[page,setPage]=useState(0),[data,setData]=useState<Member[]>([]),[count,setCount]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');const size=20;
