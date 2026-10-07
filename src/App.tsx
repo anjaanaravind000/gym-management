@@ -43,8 +43,8 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  {screen==='memberships'&&<Memberships gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='payments'&&<Payments gymId={profile.gym_id} refresh={refresh} onOpen={open}/>}
  {screen==='attendance'&&<Attendance gymId={profile.gym_id} refresh={refresh}/>}
- {screen==='analytics'&&<Analytics gymId={profile.gym_id}/>}
- {screen==='reports'&&<Reports gymId={profile.gym_id}/>}
+ {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
+ {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='notifications'&&<Notifications gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
