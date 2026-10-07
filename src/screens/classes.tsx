@@ -11,8 +11,6 @@ function toWeekStart(value:string){
  return localDateOffset(d,0);
 }
 function localDateTime(v:string){return v.replace(' ','T').slice(0,16)}
-function isoStart(date:string){return new Date(date+'T00:00:00').toISOString()}
-function isoEnd(date:string){return new Date(date+'T00:00:00').getTime()+8*86400000?new Date(date+'T00:00:00').toISOString():new Date(date+'T00:00:00').toISOString()}
 function timeLabel(v:string){return new Date(v).toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})}
 function dayLabel(date:string){return new Date(date+'T12:00:00').toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}
 function addMinutesLocal(value:string,minutes:number){
@@ -35,8 +33,8 @@ export function Classes({gymId,refresh,onBookMember}:{gymId:string;refresh:numbe
  const[roster,setRoster]=useState<ClassSession|null>(null);
 
  const weekDates=useMemo(()=>Array.from({length:7},(_,i)=>localDateOffset(week,i)),[week]);
- const from=isoStart(weekDates[0]);
- const to=new Date(new Date(weekDates[0]+'T00:00:00').getTime()+7*86400000).toISOString();
+ const from=weekDates[0];
+ const to=localDateOffset(weekDates[0],7);
 
  async function load(){
   setBusy(true);
@@ -169,7 +167,7 @@ function ClassRoster({gymId,session,onClose,onChanged}:{gymId:string;session:Cla
 
 export function ClassBookingForm({gymId,member,onClose,onSaved,session}:{gymId:string;member?:Member;onClose:()=>void;onSaved:()=>void;session?:ClassSession}){
  const[search,setSearch]=useState(''),[members,setMembers]=useState<Member[]>([]),[selected,setSelected]=useState<Member|undefined>(member),[sessions,setSessions]=useState<ClassSession[]>(session?[session]:[]),[selectedSession,setSelectedSession]=useState(session?.id||''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- useEffect(()=>{if(!session){const start=new Date().toISOString();const end=new Date(Date.now()+30*86400000).toISOString();loadClassTimetable(gymId,start,end).then(x=>setSessions(x.filter(s=>s.status==='scheduled'&&new Date(s.start_at)>new Date()))).catch((x:any)=>setError(humanError(x)))}},[gymId,session?.id]);
+ useEffect(()=>{if(!session){const start=localToday();const end=localDateOffset(start,31);loadClassTimetable(gymId,start,end).then(x=>setSessions(x.filter(s=>s.status==='scheduled'&&new Date(s.start_at)>new Date()))).catch((x:any)=>setError(humanError(x)))}},[gymId,session?.id]);
  useEffect(()=>{if(search.trim().length<2){setMembers([]);return}loadMembers({gymId,page:0,pageSize:8,q:search,status:'active'}).then(x=>setMembers(x.rows)).catch((x:any)=>setError(humanError(x)))},[search,gymId]);
  const picked=sessions.find(s=>s.id===selectedSession);
  const submit=async()=>{
