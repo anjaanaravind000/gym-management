@@ -142,7 +142,11 @@ export async function inviteStaff(args:{gymId:string;email?:string;name:string;p
  })) as string;
 }
 export async function sendWhatsapp(notificationId:string){
- const {data,error}=await requireClient().functions.invoke('send-whatsapp',{body:{notification_id:notificationId}});
+ const token=(await import('./supabase')).getStoredAppSession();
+ const {data,error}=await requireClient().functions.invoke('send-whatsapp',{
+   body:{notification_id:notificationId},
+   headers:token?{'x-gym-session':token}:{}
+ });
  if(error)throw error;if(data?.error)throw new Error(data.error);return data;
 }
 export async function syncStatuses(){return unwrap(await requireClient().rpc('sync_membership_statuses')) as unknown}
