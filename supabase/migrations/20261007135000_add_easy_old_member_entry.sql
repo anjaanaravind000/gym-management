@@ -2,6 +2,12 @@ alter type public.membership_type add value if not exists 'imported';
 
 drop function if exists public.create_old_member(uuid,text,text,text,date,public.member_status,boolean);
 
+drop function if exists public.create_old_member(
+  uuid,text,text,text,date,text,text,text,text,text,date,public.member_status,uuid,boolean,boolean,uuid,
+  date,date,public.membership_status,numeric,numeric,numeric,public.payment_method,date,text,text
+);
+
+
 create or replace function public.create_old_member(
   p_gym_id uuid,
   p_name text,
