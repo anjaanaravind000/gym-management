@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from'react';
-import{Activity,BarChart3,Bell,Check,FileBarChart,Home,LogOut,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,Users,WalletCards}from'lucide-react';
+import{Activity,BarChart3,Bell,Check,CircleDollarSign,FileBarChart,Home,LogOut,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
 import{supabase,supabaseConfig}from'./supabase';
 import{getCurrentAppSession,loadProfile,logoutAppSession}from'./data';
 import type{Member,Payment,UserProfile}from'./data';
@@ -9,13 +9,15 @@ import{Dashboard}from'./screens/dashboard';
 import{Members,MemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
+import{Finance}from'./screens/finance';
+import{Leads}from'./screens/leads';
 import{Notifications,Settings,Staff}from'./screens/admin';
 import{Sheet}from'./components/ui';import{CancelForm,FreezeForm,MessageForm,RenewForm}from'./components/lifecycle';
 
-export type Screen='dashboard'|'members'|'memberships'|'payments'|'attendance'|'analytics'|'reports'|'notifications'|'settings'|'staff';
+export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'attendance'|'analytics'|'reports'|'notifications'|'settings'|'staff';
 const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'dashboard',label:'Dashboard',icon:Home},{id:'members',label:'Members',icon:Users},{id:'memberships',label:'Memberships',icon:Package},
- {id:'payments',label:'Payments',icon:WalletCards},{id:'attendance',label:'Attendance',icon:Check},{id:'analytics',label:'Analytics',icon:BarChart3},
+ {id:'payments',label:'Payments',icon:WalletCards},{id:'finance',label:'Finance',icon:CircleDollarSign},{id:'leads',label:'Leads',icon:UserPlus},{id:'attendance',label:'Attendance',icon:Check},{id:'analytics',label:'Analytics',icon:BarChart3},
  {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck}
 ];
 export default function App(){
@@ -41,7 +43,7 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  <main className="main">{error&&<div className="toast inline-toast">{error}</div>}{screen==='dashboard'&&<Dashboard gymId={profile.gym_id} onNavigate={setScreen} onOpen={open} refresh={refresh}/>}
  {screen==='members'&&<Members gymId={profile.gym_id} refresh={refresh} onRefresh={bump} onOpen={open}/>}
  {screen==='memberships'&&<Memberships gymId={profile.gym_id} refresh={refresh}/>}
- {screen==='payments'&&<Payments gymId={profile.gym_id} refresh={refresh} onOpen={open}/>}
+ {screen==='payments'&&<Payments gymId={profile.gym_id} refresh={refresh} onOpen={open}/>} {screen==='finance'&&<Finance gymId={profile.gym_id} refresh={refresh}/>} {screen==='leads'&&<Leads gymId={profile.gym_id} refresh={refresh}/>} 
  {screen==='attendance'&&<Attendance gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
