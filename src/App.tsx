@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from'react';
-import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,FileBarChart,Home,LogOut,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
+import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,FileBarChart,Home,LogOut,MessageCircle,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
 import{supabase,supabaseConfig}from'./supabase';
 import{getCurrentAppSession,loadProfile,logoutAppSession}from'./data';
 import type{Member,Payment,UserProfile}from'./data';
@@ -9,17 +9,18 @@ import{Dashboard}from'./screens/dashboard';
 import{Members,MemberForm,OldMemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
+import{WhatsApp}from'./screens/whatsapp';
 import{Finance}from'./screens/finance';
 import{Classes,ClassBookingForm}from'./screens/classes';
 import{Leads}from'./screens/leads';
 import{Notifications,Settings,Staff}from'./screens/admin';
 import{Sheet}from'./components/ui';import{CancelForm,FreezeForm,MessageForm,RenewForm}from'./components/lifecycle';
 
-export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'analytics'|'reports'|'notifications'|'settings'|'staff';
+export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'analytics'|'reports'|'notifications'|'whatsapp'|'settings'|'staff';
 const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'dashboard',label:'Dashboard',icon:Home},{id:'members',label:'Members',icon:Users},{id:'memberships',label:'Memberships',icon:Package},
  {id:'payments',label:'Payments',icon:WalletCards},{id:'classes',label:'Classes',icon:CalendarDays},{id:'finance',label:'Finance',icon:CircleDollarSign},{id:'leads',label:'Leads',icon:UserPlus},{id:'attendance',label:'Attendance',icon:Check},{id:'analytics',label:'Analytics',icon:BarChart3},
- {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck}
+ {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'whatsapp',label:'WhatsApp',icon:MessageCircle},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck}
 ];
 export default function App(){
  const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -48,6 +49,7 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  {screen==='attendance'&&<Attendance gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
+ {screen==='whatsapp'&&<WhatsApp gymId={profile.gym_id} refresh={refresh} isAdmin={profile.role==='admin'}/>}
  {screen==='notifications'&&<Notifications gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
