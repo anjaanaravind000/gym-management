@@ -1,6 +1,8 @@
 -- Full audit hardening. Safe to replay after the existing 2026-10-09 migrations.
 
+alter table private.whatsapp_connections add column if not exists meta_app_secret text;
 create index if not exists class_sessions_created_by_idx on public.class_sessions(created_by);
+
 
 create or replace function private.normalize_member_phone(p_phone text)
 returns text language sql immutable
@@ -404,3 +406,54 @@ revoke all on table public.attendance_report,public.class_timetable_report,publi
 grant select on table public.attendance_report,public.class_timetable_report,public.coach_performance_report,public.did_not_renew_report,public.expired_members_report,public.expiring_members_report,public.member_class_bookings_report,public.member_report,public.membership_payment_summary,public.outstanding_payment_report,public.package_performance_report,public.renewal_report,public.revenue_report to anon,authenticated;
 
 alter view public.member_report set (security_invoker=true);
+
+
+create or replace function public.save_gym_profile(
+ p_gym_id uuid,p_name text,p_address text default null,p_phone text default null,p_whatsapp text default null,p_email text default null,
+ p_gst_number text default null,p_currency text default 'INR',p_timezone text default 'Asia/Kolkata',p_opening_time time default null,p_closing_time time default null,
+ p_weekly_holidays smallint[] default '{}',p_member_id_prefix text default 'GYM',p_renewal_grace_days integer default 7)
+returns public.gyms language plpgsql security definer set search_path to 'public','private','pg_catalog'
+as $$declare v public.gyms%rowtype;begin
+ if not private.is_admin(p_gym_id) then raise exception 'Unauthorized';end if;
+ if nullif(trim(p_name),'') is null then raise exception 'Gym name is required';end if;
+ if p_renewal_grace_days is null or p_renewal_grace_days<0 or p_renewal_grace_days>365 then raise exception 'Grace period must be between 0 and 365 days';end if;
+ if nullif(trim(p_currency),'') is null or length(trim(p_currency))<>3 then raise exception 'Currency must be a 3-letter code';end if;
+ if nullif(trim(p_timezone),'') is null then raise exception 'Timezone is required';end if;
+ if p_opening_time is not null and p_closing_time is not null and p_closing_time<=p_opening_time then raise exception 'Closing time must be after opening time';end if;
+ update public.gyms set name=trim(p_name),address=nullif(trim(p_address),''),phone=nullif(trim(p_phone),''),whatsapp=nullif(trim(p_whatsapp),''),email=nullif(trim(p_email),''),
+ gst_number=nullif(trim(p_gst_number),''),currency=upper(trim(p_currency)),timezone=trim(p_timezone),opening_time=p_opening_time,closing_time=p_closing_time,
+ weekly_holidays=coalesce(p_weekly_holidays,'{}'),member_id_prefix=upper(coalesce(nullif(trim(p_member_id_prefix),''),'GYM')),renewal_grace_days=p_renewal_grace_days,updated_at=now()
+ where id=p_gym_id returning * into v;if not found then raise exception 'Gym not found';end if;return v;end$$;
+
+create or replace function public.save_gym_settings(
+ p_gym_id uuid,p_expiry_reminder_10_days boolean,p_expiry_reminder_5_days boolean,p_expiry_reminder_today boolean,p_payment_reminders boolean,p_admin_alerts boolean,
+ p_whatsapp_enabled boolean,p_email_enabled boolean,p_push_enabled boolean)
+returns public.gym_settings language plpgsql security definer set search_path to 'public','private','pg_catalog'
+as $$declare v public.gym_settings%rowtype;begin
+ if not private.is_admin(p_gym_id) then raise exception 'Unauthorized';end if;
+ update public.gym_settings set expiry_reminder_10_days=p_expiry_reminder_10_days,expiry_reminder_5_days=p_expiry_reminder_5_days,
+ expiry_reminder_today=p_expiry_reminder_today,payment_reminders=p_payment_reminders,admin_alerts=p_admin_alerts,
+ whatsapp_enabled=p_whatsapp_enabled,email_enabled=p_email_enabled,push_enabled=p_push_enabled,updated_at=now()
+ where gym_id=p_gym_id returning * into v;if not found then raise exception 'Gym settings not found';end if;return v;end$$;
+
+create or replace function public.save_payment_method_setting(p_gym_id uuid,p_payment_method public.payment_method,p_enabled boolean)
+returns void language plpgsql security definer set search_path to 'public','private','pg_catalog'
+as $$begin
+ if not private.is_admin(p_gym_id) then raise exception 'Unauthorized';end if;
+ insert into public.payment_method_settings(gym_id,payment_method,enabled) values(p_gym_id,p_payment_method,p_enabled)
+ on conflict(gym_id,payment_method) do update set enabled=excluded.enabled;
+end$$;
+
+create or replace function public.save_notification_template(
+ p_gym_id uuid,p_template_id uuid,p_body text,p_enabled boolean,p_subject text default null,
+ p_provider_template_name text default null,p_provider_template_language text default 'en_US',p_provider_template_variables text[] default '{}')
+returns public.notification_templates language plpgsql security definer set search_path to 'public','private','pg_catalog'
+as $$declare v public.notification_templates%rowtype;begin
+ if not(private.is_admin(p_gym_id) or private.has_permission(p_gym_id,'whatsapp.manage')) then raise exception 'Unauthorized';end if;
+ if nullif(trim(p_body),'') is null then raise exception 'Template body is required';end if;
+ update public.notification_templates set body=p_body,enabled=p_enabled,subject=nullif(trim(p_subject),''),provider_template_name=nullif(trim(p_provider_template_name),''),
+ provider_template_language=coalesce(nullif(trim(p_provider_template_language),''),'en_US'),provider_template_variables=coalesce(p_provider_template_variables,'{}'),updated_at=now()
+ where id=p_template_id and gym_id=p_gym_id returning * into v;
+ if not found then raise exception 'Notification template not found';end if;return v;end$$;
+
+revoke insert,update,delete,truncate,references,trigger on public.gyms,public.gym_settings,public.payment_method_settings,public.notification_templates from anon,authenticated;
