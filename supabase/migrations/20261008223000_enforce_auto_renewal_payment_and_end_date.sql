@@ -58,8 +58,9 @@ begin
  v_end:=public.calculate_membership_end_by_unit(v_start,v_duration,v_unit);
  if v_end<v_start then raise exception 'Invalid membership dates'; end if;
  v_final:=greatest(v_price-coalesce(p_discount,0),0);
- if p_amount_paid<>v_final then raise exception 'Renewal payment must equal the final membership amount'; end if;
- if v_final>0 and not exists(
+ if p_amount_paid>v_final then raise exception 'Amount paid cannot exceed final membership amount'; end if;
+ if v_final>0 and p_amount_paid<=0 then raise exception 'Renewal requires a payment'; end if;
+ if p_amount_paid>0 and not exists(
    select 1 from public.payment_method_settings
    where gym_id=p_gym_id and payment_method=p_payment_method and enabled
  ) then raise exception 'Selected payment method is disabled'; end if;
@@ -74,7 +75,7 @@ begin
  values(p_gym_id,p_member_id,p_package_id,'renewal',v_start,v_end,v_duration,v_price,coalesce(p_discount,0),'active',v_old.id,private.current_app_user_id())
  returning id into v_new;
 
- if v_final>0 then
+ if p_amount_paid>0 then
    insert into public.payments(gym_id,member_id,membership_id,amount,payment_method,transaction_reference,notes,recorded_by,status)
    values(p_gym_id,p_member_id,v_new,v_final,p_payment_method,nullif(trim(p_transaction_reference),''),p_notes,private.current_app_user_id(),'paid');
  end if;
