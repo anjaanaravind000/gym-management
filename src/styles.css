@@ -387,3 +387,11 @@ th,td{border-bottom-color:#202a22}
 }
 
 .profile-attendance-message{margin:-4px 0 12px}.success-banner{border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.08);color:#b8f5c9;padding:10px 12px;border-radius:12px;font-size:12px;font-weight:650}
+
+.whatsapp-tabs{display:flex;flex-wrap:wrap;gap:7px}.whatsapp-tabs button{display:flex;align-items:center;gap:6px}
+.connected-badge,.disconnected-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:750;padding:6px 9px;border-radius:999px}
+.connected-badge{color:#bbf7d0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25)}
+.disconnected-badge{color:#fecaca;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
+.profile-tab-shell{position:sticky;top:-10px;z-index:12;background:#131319;padding-top:4px;margin:0 -18px 15px}
+.profile-tab-shell .tab-row{position:static;margin:0;padding:8px 18px 6px}
+@media(max-width:720px){.whatsapp-tabs button{flex:1;justify-content:center}.profile-tab-shell{top:-10px}.profile-tab-shell .tab-row{overflow-x:auto}}
