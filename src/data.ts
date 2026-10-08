@@ -241,6 +241,10 @@ export async function inviteStaff(args:{gymId:string;email?:string;name:string;p
    p_email:args.email??null,p_phone:args.phone??null,p_role:args.role
  })) as string;
 }
+export type WhatsAppConnection={connected:boolean;business_account_id:string|null;phone_number_id:string|null;api_version:string|null;enabled:boolean;last_tested_at:string|null;last_test_ok:boolean|null;last_error:string|null};
+export async function loadWhatsappConnection(gymId:string){return unwrap(await requireClient().rpc('get_whatsapp_connection',{p_gym_id:gymId})) as unknown as WhatsAppConnection[]}
+export async function saveWhatsappConnection(a:{gymId:string;businessAccountId?:string;phoneNumberId:string;accessToken:string;apiVersion:string;verifyToken?:string}){return unwrap(await requireClient().rpc('save_whatsapp_connection',{p_gym_id:a.gymId,p_business_account_id:a.businessAccountId??null,p_phone_number_id:a.phoneNumberId,p_access_token:a.accessToken,p_api_version:a.apiVersion,p_verify_token:a.verifyToken??null})) as unknown}
+export async function disconnectWhatsapp(gymId:string){return unwrap(await requireClient().rpc('disconnect_whatsapp_connection',{p_gym_id:gymId})) as unknown}
 export async function sendWhatsapp(notificationId:string){
  const token=(await import('./supabase')).getStoredAppSession();
  const {data,error}=await requireClient().functions.invoke('send-whatsapp',{
