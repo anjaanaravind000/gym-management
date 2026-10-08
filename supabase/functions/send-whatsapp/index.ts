@@ -1,14 +1,19 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-gym-session, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:cors});
+const sha256=async(value:string)=>{const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,"0")).join("")};
 Deno.serve(async(req)=>{if(req.method==="OPTIONS")return new Response("ok",{headers:cors});try{
-const token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"");if(!token)return json({error:"Authentication required"},401);
-const pk=JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS")??"{}"),sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}"),url=Deno.env.get("SUPABASE_URL"),pub=pk.default,secret=sk.default;
-if(!url||!pub||!secret)return json({error:"Function configuration is incomplete"},500);
-const auth=createClient(url,pub),ad=createClient(url,secret),au=await auth.auth.getUser(token);if(au.error||!au.data.user)return json({error:"Invalid session"},401);
+const sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}"),url=Deno.env.get("SUPABASE_URL"),secret=sk.default;
+if(!url||!secret)return json({error:"Function configuration is incomplete"},500);
+const ad=createClient(url,secret);
+const sessionToken=req.headers.get("x-gym-session")?.trim();
+if(!sessionToken)return json({error:"Gym session required"},401);
+const tokenHash=await sha256(sessionToken);
+const{data:session}=await ad.from("login_sessions").select("user_id,expires_at").eq("token_hash",tokenHash).gt("expires_at",new Date().toISOString()).maybeSingle();
+if(!session)return json({error:"Invalid or expired gym session"},401);
 const{notification_id}=await req.json();if(!notification_id)return json({error:"notification_id is required"},400);
 const{data:n,error:ne}=await ad.from("notifications").select("*,members(name,member_id,phone),gyms(name,phone,whatsapp)").eq("id",notification_id).maybeSingle();if(ne||!n)return json({error:"Notification not found"},404);
-const{data:u}=await ad.from("users").select("id,gym_id,role,status").eq("id",au.data.user.id).eq("gym_id",n.gym_id).maybeSingle();if(!u||u.status!=="active")return json({error:"Unauthorized"},403);
+const{data:u}=await ad.from("users").select("id,gym_id,role,status").eq("id",session.user_id).eq("gym_id",n.gym_id).maybeSingle();if(!u||u.status!=="active")return json({error:"Unauthorized"},403);
 const{data:perm}=await ad.from("user_permissions").select("allowed").eq("user_id",u.id).eq("permission","whatsapp.manage").maybeSingle();if(u.role!=="admin"&&!perm?.allowed)return json({error:"Unauthorized"},403);
 if(n.status==="sent"||n.delivery_status==="delivered")return json({ok:true,already_sent:true});
 const phone=n.members?.phone;if(!phone)return json({error:"Member has no WhatsApp/mobile number"},400);
