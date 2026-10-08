@@ -1,0 +1,13 @@
+alter view public.attendance_report set (security_invoker = true);
+alter view public.class_timetable_report set (security_invoker = true);
+alter view public.coach_performance_report set (security_invoker = true);
+alter view public.did_not_renew_report set (security_invoker = true);
+alter view public.expired_members_report set (security_invoker = true);
+alter view public.expiring_members_report set (security_invoker = true);
+alter view public.member_class_bookings_report set (security_invoker = true);
+alter view public.member_report set (security_invoker = true);
+alter view public.membership_payment_summary set (security_invoker = true);
+alter view public.outstanding_payment_report set (security_invoker = true);
+alter view public.package_performance_report set (security_invoker = true);
+alter view public.renewal_report set (security_invoker = true);
+alter view public.revenue_report set (security_invoker = true);
