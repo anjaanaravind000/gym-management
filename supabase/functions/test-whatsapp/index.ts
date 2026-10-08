@@ -10,7 +10,7 @@ Deno.serve(async(req)=>{if(req.method==="OPTIONS")return new Response("ok",{head
  const{data:cx}=await db.rpc("get_whatsapp_credentials_internal",{p_gym_id:g.gym_id});const c=Array.isArray(cx)?cx[0]:cx;if(!c)return json({error:"WhatsApp connection has not been saved"},400);
  const resp=await fetch("https://graph.facebook.com/"+c.api_version+"/"+c.phone_number_id+"?fields=display_phone_number,verified_name",{headers:{Authorization:"Bearer "+c.access_token}});
  const result=await resp.json(),ok=resp.ok;
- await db.from("gyms").select("id").eq("id",g.gym_id).limit(1);
+ await db.rpc("record_whatsapp_test_internal",{p_gym_id:g.gym_id,p_ok:ok,p_error:ok?null:JSON.stringify(result)});
  if(!ok)return json({ok:false,error:"WhatsApp connection was rejected by Meta",details:result},502);
  return json({ok:true,display_phone_number:result?.display_phone_number??null,verified_name:result?.verified_name??null});
 }catch(e){return json({error:e instanceof Error?e.message:"Unexpected error"},500)}});
