@@ -220,6 +220,14 @@ export function localDateOffset(value:string|Date,days:number){
  d.setHours(12,0,0,0);d.setDate(d.getDate()+days);
  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
+export function membershipEndByUnit(start:string,duration:number,unit='month'){
+ if(!start||!Number.isInteger(duration)||duration<=0)return '';
+ const d=new Date(start+'T12:00:00');
+ if((unit||'month').toLowerCase()==='day'){d.setDate(d.getDate()+duration-1);return localDateOffset(d,0)}
+ const originalDay=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+duration);
+ const lastDay=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(originalDay,lastDay));d.setDate(d.getDate()-1);
+ return localDateOffset(d,0);
+}
 export function money(value:number,currency='INR'){return new Intl.NumberFormat('en-IN',{style:'currency',currency,maximumFractionDigits:0}).format(Number(value||0))}
 export function date(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value+'T00:00:00')):'—'}
 export function dateTime(value:string|null){return value?new Intl.DateTimeFormat('en-IN',{day:'2-digit',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—'}
