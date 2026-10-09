@@ -12,5 +12,10 @@ let verified=false;
 for(const row of (Array.isArray(appSecrets)?appSecrets:[])){if(row?.meta_app_secret){const expected=(await hmacHex(row.meta_app_secret,raw)).toLowerCase();if(safeEqual(expected,provided)){verified=true;break}}}
 if(!verified)return json({error:"Invalid webhook signature"},401);
 let body:any;try{body=JSON.parse(raw)}catch{return json({error:"Invalid JSON"},400)}
-for(const entry of body.entry??[])for(const ch of entry.changes??[])for(const s of ch.value?.statuses??[]){const state=s.status==="read"?"read":s.status==="delivered"?"delivered":s.status==="sent"?"sent":s.status==="failed"?"failed":"pending";const errorMessage=s.status==="failed"?JSON.stringify(s.errors??[]):null;await ad.from("notification_logs").update({delivery_status:state,status:state==="failed"?"failed":"sent",error_message:errorMessage}).eq("provider_message_id",s.id);const{data:logs}=await ad.from("notification_logs").select("notification_id").eq("provider_message_id",s.id);for(const l of logs??[])await ad.from("notifications").update({status:state==="failed"?"failed":"sent",delivery_status:state,error_message:errorMessage}).eq("id",l.notification_id)}
+for(const entry of body.entry??[]){for(const ch of entry.changes??[]){for(const s of ch.value?.statuses??[]){
+ if(!s?.id||!["sent","delivered","read","failed"].includes(s.status))continue;
+ const errorMessage=s.status==="failed"?JSON.stringify(s.errors??[]):null;
+ const{error:statusError}=await ad.rpc("record_whatsapp_delivery_status_internal",{p_provider_message_id:String(s.id),p_status:s.status,p_error_message:errorMessage});
+ if(statusError)console.error("Failed to apply WhatsApp delivery callback",s.id,statusError);
+}}}
 return json({ok:true})}catch(e){return json({error:e instanceof Error?e.message:"Unexpected error"},500)}});
