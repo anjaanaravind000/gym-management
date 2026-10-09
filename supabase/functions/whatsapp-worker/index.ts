@@ -29,7 +29,7 @@ Deno.serve(async req=>{
   const{data:rows,error:queueError}=await db.from("notifications")
    .select("id,message_body,retry_count,notification_type,gym_id,members(name,member_id,phone),gyms(name,phone,whatsapp),memberships(start_date,end_date,membership_packages(name))")
    .eq("channel","whatsapp").in("status",["queued","failed"]).lt("retry_count",3)
-   .order("scheduled_at").limit(50);
+   .order("scheduled_at").limit(8);
   if(queueError)return json({error:"Unable to load WhatsApp queue"},500);
 
   let sent=0,failed=0,skipped=0;
@@ -64,11 +64,33 @@ Deno.serve(async req=>{
      message.text={preview_url:false,body:n.message_body??"Your gym membership needs attention."};
     }
 
-    const response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
-     method:"POST",
-     headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
-     body:JSON.stringify(message)
-    });
+    let response:Response;
+    try{
+     const controller=new AbortController();
+     const timer=setTimeout(()=>controller.abort(),10000);
+     try{
+      response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
+       method:"POST",
+       headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
+       body:JSON.stringify(message),
+       signal:controller.signal
+      });
+     }finally{clearTimeout(timer)}
+    }catch(fetchError){
+     const errorMessage="Message delivery timed out or the network closed before Meta returned a result. Delivery is unconfirmed; this attempt was not automatically retried to avoid a duplicate. Check WhatsApp Manager before sending again.";
+     const{error:finishError}=await db.rpc("finish_whatsapp_notification_internal",{
+      p_notification_id:n.id,p_provider_message_id:null,p_success:false,
+      p_error_message:errorMessage,p_previous_retry_count:2
+     });
+     if(finishError){
+      await db.from("notifications").update({status:"failed",delivery_status:"failed",error_message:errorMessage,retry_count:3}).eq("id",n.id);
+      await db.from("notification_logs").insert({notification_id:n.id,status:"failed",delivery_status:"failed",error_message:errorMessage});
+      await db.rpc("release_whatsapp_notification_internal",{p_notification_id:n.id});
+     }
+     console.error("WhatsApp request timed out or lost connection; automatic retry disabled",n.id,fetchError);
+     failed++;
+     continue;
+    }
     const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
     const state=response.ok?"sent":"failed";
     const errorMessage=response.ok?null:JSON.stringify(result);
