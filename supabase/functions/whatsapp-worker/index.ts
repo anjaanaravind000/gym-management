@@ -1,10 +1,99 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"content-type, x-worker-secret","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
-const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:cors});
-const val=(k:string,n:any)=>({member_name:n.members?.name,member_id:n.members?.member_id,gym_name:n.gyms?.name,package_name:n.memberships?.membership_packages?.name,start_date:n.memberships?.start_date,expiry_date:n.memberships?.end_date,gym_phone:n.gyms?.phone,gym_whatsapp:n.gyms?.whatsapp})[k]??"";
-Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{headers:cors});try{
-const sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}"),url=Deno.env.get("SUPABASE_URL"),service=sk.default;if(!url||!service)return json({error:"WhatsApp worker is not configured"},500);
-const db=createClient(url,service),{data:workerSecret}=await db.rpc("get_whatsapp_worker_secret_internal");const expected=Array.isArray(workerSecret)?workerSecret[0]:workerSecret;if(!expected||req.headers.get("x-worker-secret")!==expected)return json({error:"Unauthorized"},401);
-const{data:rows}=await db.from("notifications").select("id,message_body,retry_count,notification_type,gym_id,members(name,member_id,phone),gyms(name,phone,whatsapp),memberships(start_date,end_date,membership_packages(name))").eq("channel","whatsapp").in("status",["queued","failed"]).lt("retry_count",3).order("scheduled_at").limit(50);
-let sent=0,failed=0;for(const n of rows??[]){if(!n.members?.phone)continue;const{data:cx}=await db.rpc("get_whatsapp_credentials_internal",{p_gym_id:n.gym_id});const connection=Array.isArray(cx)?cx[0]:cx;if(!connection?.enabled)continue;const access=connection.access_token,numberId=connection.phone_number_id,version=connection.api_version;const{data:t}=await db.from("notification_templates").select("provider_template_name,provider_template_language,provider_template_variables").eq("gym_id",n.gym_id).eq("notification_type",n.notification_type).eq("channel","whatsapp").eq("enabled",true).maybeSingle();let msg:any={messaging_product:"whatsapp",to:n.members.phone.replace(/\D/g,"")};if(t?.provider_template_name){msg.type="template";msg.template={name:t.provider_template_name,language:{code:t.provider_template_language||"en_US"}};const vars=t.provider_template_variables??[];if(vars.length)msg.template.components=[{type:"body",parameters:vars.map((k:string)=>({type:"text",text:String(val(k,n))}))}]}else{msg.type="text";msg.text={preview_url:false,body:n.message_body??"Your gym membership needs attention."}}const resp=await fetch("https://graph.facebook.com/"+version+"/"+numberId+"/messages",{method:"POST",headers:{Authorization:"Bearer "+access,"Content-Type":"application/json"},body:JSON.stringify(msg)}),result=await resp.json(),pid=result?.messages?.[0]?.id??null;await db.from("notification_logs").insert({notification_id:n.id,status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",provider_message_id:pid,error_message:resp.ok?null:JSON.stringify(result)});await db.from("notifications").update({status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",sent_at:resp.ok?new Date().toISOString():null,error_message:resp.ok?null:JSON.stringify(result),retry_count:(n.retry_count??0)+(resp.ok?0:1)}).eq("id",n.id);if(resp.ok)sent++;else failed}
-return json({ok:true,processed:sent+failed,sent,failed})}catch(e){return json({error:e instanceof Error?e.message:"Unexpected error"},500)}});
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
+const value=(key:string,n:any)=>({
+  member_name:n.members?.name,
+  member_id:n.members?.member_id,
+  gym_name:n.gyms?.name,
+  package_name:n.memberships?.membership_packages?.name,
+  start_date:n.memberships?.start_date,
+  expiry_date:n.memberships?.end_date,
+  gym_phone:n.gyms?.phone,
+  gym_whatsapp:n.gyms?.whatsapp
+} as Record<string,unknown>)[key]??"";
+const scalarBool=(v:any)=>Array.isArray(v)?v[0]===true:v===true;
+
+Deno.serve(async req=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
+ if(req.method!=="POST")return json({error:"Method not allowed"},405);
+ try{
+  const sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}");
+  const url=Deno.env.get("SUPABASE_URL"),service=sk.default;
+  if(!url||!service)return json({error:"WhatsApp worker is not configured"},500);
+  const db=createClient(url,service);
+  const{data:workerSecret,error:secretError}=await db.rpc("get_whatsapp_worker_secret_internal");
+  const expected=Array.isArray(workerSecret)?workerSecret[0]:workerSecret;
+  if(secretError||!expected||req.headers.get("x-worker-secret")!==expected)return json({error:"Unauthorized"},401);
+
+  const{data:rows,error:queueError}=await db.from("notifications")
+   .select("id,message_body,retry_count,notification_type,gym_id,members(name,member_id,phone),gyms(name,phone,whatsapp),memberships(start_date,end_date,membership_packages(name))")
+   .eq("channel","whatsapp").in("status",["queued","failed"]).lt("retry_count",3)
+   .order("scheduled_at").limit(50);
+  if(queueError)return json({error:"Unable to load WhatsApp queue"},500);
+
+  let sent=0,failed=0,skipped=0;
+  for(const n of rows??[]){
+   const phone=String(n.members?.phone??"").replace(/\D/g,"");
+   if(!phone){
+    await db.from("notifications").update({status:"failed",delivery_status:"failed",error_message:"No usable member phone number is saved.",retry_count:3}).eq("id",n.id);
+    failed++;continue;
+   }
+
+   const{data:cx,error:connectionError}=await db.rpc("get_whatsapp_credentials_internal",{p_gym_id:n.gym_id});
+   const connection=Array.isArray(cx)?cx[0]:cx;
+   if(connectionError||!connection?.enabled||connection.last_test_ok!==true){skipped++;continue;}
+
+   const{data:claimed,error:claimError}=await db.rpc("claim_whatsapp_notification_internal",{p_notification_id:n.id});
+   if(claimError||!scalarBool(claimed)){skipped++;continue;}
+
+   try{
+    const{data:t,error:templateError}=await db.from("notification_templates")
+     .select("provider_template_name,provider_template_language,provider_template_variables")
+     .eq("gym_id",n.gym_id).eq("notification_type",n.notification_type).eq("channel","whatsapp").eq("enabled",true).maybeSingle();
+    if(templateError)throw new Error("Unable to load WhatsApp template");
+
+    let message:any={messaging_product:"whatsapp",to:phone};
+    if(t?.provider_template_name){
+     message.type="template";
+     message.template={name:t.provider_template_name,language:{code:t.provider_template_language||"en_US"}};
+     const variables=t.provider_template_variables??[];
+     if(variables.length)message.template.components=[{type:"body",parameters:variables.map((key:string)=>({type:"text",text:String(value(key,n))}))}];
+    }else{
+     message.type="text";
+     message.text={preview_url:false,body:n.message_body??"Your gym membership needs attention."};
+    }
+
+    const response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
+     method:"POST",
+     headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
+     body:JSON.stringify(message)
+    });
+    const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
+    const state=response.ok?"sent":"failed";
+    const errorMessage=response.ok?null:JSON.stringify(result);
+    const logResult=await db.from("notification_logs").insert({
+     notification_id:n.id,status:state,delivery_status:state,provider_message_id:providerId,error_message:errorMessage
+    });
+    if(logResult.error)throw new Error("Provider responded, but the delivery log could not be saved; keeping the lease to avoid an immediate duplicate.");
+    const updateResult=await db.from("notifications").update({
+     status:state,delivery_status:state,sent_at:response.ok?new Date().toISOString():null,error_message:errorMessage,
+     retry_count:response.ok?(n.retry_count??0):(n.retry_count??0)+1
+    }).eq("id",n.id);
+    if(updateResult.error)throw new Error("Provider responded, but notification status could not be saved; keeping the lease to avoid an immediate duplicate.");
+
+    if(response.ok)sent++;else failed++;
+    await db.rpc("release_whatsapp_notification_internal",{p_notification_id:n.id});
+   }catch(error){
+    // Keep the five-minute lease after unexpected failures. It will expire automatically
+    // so another worker can recover, without racing this attempt.
+    console.error("WhatsApp notification processing failed",n.id,error);
+    failed++;
+   }
+  }
+  return json({ok:true,processed:sent+failed,sent,failed,skipped});
+ }catch(error){
+  console.error("WhatsApp worker failed",error);
+  return json({error:"Unexpected worker error"},500);
+ }
+});
