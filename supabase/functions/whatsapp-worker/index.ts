@@ -72,18 +72,17 @@ Deno.serve(async req=>{
     const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
     const state=response.ok?"sent":"failed";
     const errorMessage=response.ok?null:JSON.stringify(result);
-    const logResult=await db.from("notification_logs").insert({
-     notification_id:n.id,status:state,delivery_status:state,provider_message_id:providerId,error_message:errorMessage
-    });
-    if(logResult.error)throw new Error("Provider responded, but the delivery log could not be saved; keeping the lease to avoid an immediate duplicate.");
     const updateResult=await db.from("notifications").update({
      status:state,delivery_status:state,sent_at:response.ok?new Date().toISOString():null,error_message:errorMessage,
      retry_count:response.ok?(n.retry_count??0):(n.retry_count??0)+1
     }).eq("id",n.id);
     if(updateResult.error)throw new Error("Provider responded, but notification status could not be saved; keeping the lease to avoid an immediate duplicate.");
-
     if(response.ok)sent++;else failed++;
     await db.rpc("release_whatsapp_notification_internal",{p_notification_id:n.id});
+    const logResult=await db.from("notification_logs").insert({
+     notification_id:n.id,status:state,delivery_status:state,provider_message_id:providerId,error_message:errorMessage
+    });
+    if(logResult.error)console.error("WhatsApp delivery log insert failed after status was saved",n.id,logResult.error);
    }catch(error){
     // Keep the five-minute lease after unexpected failures. It will expire automatically
     // so another worker can recover, without racing this attempt.
