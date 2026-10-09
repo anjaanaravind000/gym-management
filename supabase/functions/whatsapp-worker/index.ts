@@ -13,6 +13,7 @@ const value=(key:string,n:any)=>({
   gym_whatsapp:n.gyms?.whatsapp
 } as Record<string,unknown>)[key]??"";
 const scalarBool=(v:any)=>Array.isArray(v)?v[0]===true:v===true;
+const normalizeWhatsappNumber=(value:unknown)=>{const digits=String(value??"").replace(/\D/g,"");if(digits.length===10)return "91"+digits;if(digits.length===11&&digits.startsWith("0"))return "91"+digits.slice(1);if(digits.length>=11&&digits.length<=15)return digits;return ""};
 
 Deno.serve(async req=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
@@ -34,9 +35,9 @@ Deno.serve(async req=>{
 
   let sent=0,failed=0,skipped=0;
   for(const n of rows??[]){
-   const phone=String(n.members?.phone??"").replace(/\D/g,"");
+   const phone=normalizeWhatsappNumber(n.members?.phone);
    if(!phone){
-    await db.from("notifications").update({status:"failed",delivery_status:"failed",error_message:"No usable member phone number is saved.",retry_count:3}).eq("id",n.id);
+    await db.from("notifications").update({status:"failed",delivery_status:"failed",error_message:"No usable phone number is saved. Use 10-digit Indian numbers or store an international number with its country calling code.",retry_count:3}).eq("id",n.id);
     failed++;continue;
    }
 
