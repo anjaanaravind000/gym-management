@@ -104,4 +104,4 @@ begin
 end
 $$;
 revoke all on function public.create_member_from_lead(uuid,uuid,text,text,text,date,text,text,text,text,text,uuid,integer,date,date,numeric,numeric,numeric,public.payment_method,text,text,uuid,boolean) from public;
-grant execute on function public.create_member_from_lead(uuid,uuid,text,text,text,date,date,text,text,text,text,text,uuid,integer,date,date,numeric,numeric,numeric,public.payment_method,text,text,uuid,boolean) to anon,authenticated;
+grant execute on function public.create_member_from_lead(uuid,uuid,text,text,text,date,text,text,text,text,text,uuid,integer,date,date,numeric,numeric,numeric,public.payment_method,text,text,uuid,boolean) to anon,authenticated;
