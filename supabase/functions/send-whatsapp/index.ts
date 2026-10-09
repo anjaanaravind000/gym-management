@@ -53,18 +53,12 @@ Deno.serve(async req=>{
    body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}})
   });
   const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
-  const status=response.ok?"sent":"failed",errorMessage=response.ok?null:JSON.stringify(result);
-  const{error:saveError}=await db.from("notifications").update({
-   status,delivery_status:status,sent_at:response.ok?new Date().toISOString():null,error_message:errorMessage,
-   retry_count:response.ok?(n.retry_count??0):(n.retry_count??0)+1
-  }).eq("id",notificationId);
-  if(saveError)return json({error:"Provider responded, but the message status could not be saved. The send lease will expire automatically."},500);
-
-  await db.rpc("release_whatsapp_notification_internal",{p_notification_id:notificationId});
-  const{error:logError}=await db.from("notification_logs").insert({
-   notification_id:notificationId,status,delivery_status:status,provider_message_id:providerId,error_message:errorMessage
+  const errorMessage=response.ok?null:JSON.stringify(result);
+  const{error:finishError}=await db.rpc("finish_whatsapp_notification_internal",{
+   p_notification_id:notificationId,p_provider_message_id:providerId,p_success:response.ok,
+   p_error_message:errorMessage,p_previous_retry_count:Number(n.retry_count??0)
   });
-  if(logError)return json({error:"Message status was saved, but its delivery log could not be recorded."},500);
+  if(finishError)return json({error:"Provider responded, but delivery could not be finalized atomically. The send lease will expire automatically."},500);
   if(!response.ok)return json({error:"WhatsApp provider rejected the message",provider:result},502);
   return json({ok:true,provider_message_id:providerId});
  }catch(error){
