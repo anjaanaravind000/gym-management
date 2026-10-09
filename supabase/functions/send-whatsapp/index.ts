@@ -1,27 +1,74 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-gym-session, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Content-Type":"application/json"};
-const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:cors});
+const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
 const sha256=async(value:string)=>{const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,"0")).join("")};
-Deno.serve(async(req)=>{if(req.method==="OPTIONS")return new Response("ok",{headers:cors});try{
-const sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}"),url=Deno.env.get("SUPABASE_URL"),secret=sk.default;
-if(!url||!secret)return json({error:"Function configuration is incomplete"},500);
-const ad=createClient(url,secret);
-const sessionToken=req.headers.get("x-gym-session")?.trim();
-if(!sessionToken)return json({error:"Gym session required"},401);
-const tokenHash=await sha256(sessionToken);
-const{data:session}=await ad.from("login_sessions").select("user_id,expires_at").eq("token_hash",tokenHash).gt("expires_at",new Date().toISOString()).maybeSingle();
-if(!session)return json({error:"Invalid or expired gym session"},401);
-const{notification_id}=await req.json();if(!notification_id)return json({error:"notification_id is required"},400);
-const{data:n,error:ne}=await ad.from("notifications").select("*,members(name,member_id,phone),gyms(name,phone,whatsapp)").eq("id",notification_id).maybeSingle();if(ne||!n)return json({error:"Notification not found"},404);
-const{data:u}=await ad.from("users").select("id,gym_id,role,status").eq("id",session.user_id).eq("gym_id",n.gym_id).maybeSingle();if(!u||u.status!=="active")return json({error:"Unauthorized"},403);
-const{data:perm}=await ad.from("user_permissions").select("allowed").eq("user_id",u.id).eq("permission","whatsapp.manage").maybeSingle();if(u.role!=="admin"&&!perm?.allowed)return json({error:"Unauthorized"},403);
-if(n.status==="sent"||n.delivery_status==="delivered")return json({ok:true,already_sent:true});
-const phone=n.members?.phone;if(!phone)return json({error:"Member has no WhatsApp/mobile number"},400);
-const{data:connection,error:ce}=await ad.rpc("get_whatsapp_credentials_internal",{p_gym_id:n.gym_id});if(ce)return json({error:"Unable to load WhatsApp connection"},500);const credentials=Array.isArray(connection)?connection[0]:connection;if(!credentials?.enabled)return json({error:"WhatsApp is not connected for this gym. Open WhatsApp and save the connection details first."},503);const access=credentials.access_token,numberId=credentials.phone_number_id,version=credentials.api_version;
-const resp=await fetch("https://graph.facebook.com/"+version+"/"+numberId+"/messages",{method:"POST",headers:{Authorization:"Bearer "+access,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:phone.replace(/\D/g,""),type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}})});
-const result=await resp.json(),providerId=result?.messages?.[0]?.id??null;
-await ad.from("notification_logs").insert({notification_id:n.id,status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",provider_message_id:providerId,error_message:resp.ok?null:JSON.stringify(result)});
-await ad.from("notifications").update({status:resp.ok?"sent":"failed",delivery_status:resp.ok?"sent":"failed",sent_at:resp.ok?new Date().toISOString():null,error_message:resp.ok?null:JSON.stringify(result),retry_count:resp.ok?n.retry_count:(n.retry_count??0)+1}).eq("id",n.id);
-if(!resp.ok)return json({error:"WhatsApp provider rejected the message",provider:result},502);
-return json({ok:true,provider_message_id:providerId});
-}catch(e){return json({error:e instanceof Error?e.message:"Unexpected error"},500)}});
+const scalarBool=(v:any)=>Array.isArray(v)?v[0]===true:v===true;
+
+Deno.serve(async req=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
+ if(req.method!=="POST")return json({error:"Method not allowed"},405);
+ try{
+  const sk=JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS")??"{}");
+  const url=Deno.env.get("SUPABASE_URL"),secret=sk.default;
+  if(!url||!secret)return json({error:"Function configuration is incomplete"},500);
+  const db=createClient(url,secret);
+  const sessionToken=req.headers.get("x-gym-session")?.trim();
+  if(!sessionToken)return json({error:"Gym session required"},401);
+
+  const tokenHash=await sha256(sessionToken);
+  const{data:session}=await db.from("login_sessions").select("user_id,expires_at").eq("token_hash",tokenHash).gt("expires_at",new Date().toISOString()).maybeSingle();
+  if(!session)return json({error:"Invalid or expired gym session"},401);
+
+  const payload=await req.json(),notificationId=payload?.notification_id;
+  if(typeof notificationId!=="string"||!notificationId)return json({error:"notification_id is required"},400);
+  const{data:n,error:notificationError}=await db.from("notifications")
+   .select("*,members(name,member_id,phone),gyms(name,phone,whatsapp)")
+   .eq("id",notificationId).maybeSingle();
+  if(notificationError||!n)return json({error:"Notification not found"},404);
+
+  const{data:u}=await db.from("users").select("id,gym_id,role,status").eq("id",session.user_id).eq("gym_id",n.gym_id).maybeSingle();
+  if(!u||u.status!=="active")return json({error:"Unauthorized"},403);
+  const{data:perm}=await db.from("user_permissions").select("allowed").eq("user_id",u.id).eq("permission","whatsapp.manage").maybeSingle();
+  if(u.role!=="admin"&&!perm?.allowed)return json({error:"Unauthorized"},403);
+  if(n.status==="sent"||n.delivery_status==="delivered"||n.delivery_status==="read")return json({ok:true,already_sent:true});
+  if(!["queued","failed"].includes(n.status)||Number(n.retry_count??0)>=3)return json({error:"This message is no longer eligible to send"},409);
+
+  const phone=String(n.members?.phone??"").replace(/\D/g,"");
+  if(!phone)return json({error:"Member has no WhatsApp/mobile number"},400);
+
+  const{data:cx,error:connectionError}=await db.rpc("get_whatsapp_credentials_internal",{p_gym_id:n.gym_id});
+  if(connectionError)return json({error:"Unable to load WhatsApp connection"},500);
+  const connection=Array.isArray(cx)?cx[0]:cx;
+  if(!connection?.enabled||connection.last_test_ok!==true)return json({error:"WhatsApp connection must be tested successfully before sending messages"},503);
+
+  const{data:claimed,error:claimError}=await db.rpc("claim_whatsapp_notification_internal",{p_notification_id:notificationId});
+  if(claimError)return json({error:"Unable to claim this message safely"},500);
+  if(!scalarBool(claimed))return json({error:"This message is already being sent or has already been handled"},409);
+
+  // If fetch times out, leave the lease to expire automatically. This blocks competing sends
+  // for five minutes because Meta may have accepted the message even if the response was lost.
+  const response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
+   method:"POST",headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
+   body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}})
+  });
+  const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
+  const status=response.ok?"sent":"failed",errorMessage=response.ok?null:JSON.stringify(result);
+  const{error:saveError}=await db.from("notifications").update({
+   status,delivery_status:status,sent_at:response.ok?new Date().toISOString():null,error_message:errorMessage,
+   retry_count:response.ok?(n.retry_count??0):(n.retry_count??0)+1
+  }).eq("id",notificationId);
+  if(saveError)return json({error:"Provider responded, but the message status could not be saved. The send lease will expire automatically."},500);
+
+  await db.rpc("release_whatsapp_notification_internal",{p_notification_id:notificationId});
+  const{error:logError}=await db.from("notification_logs").insert({
+   notification_id:notificationId,status,delivery_status:status,provider_message_id:providerId,error_message:errorMessage
+  });
+  if(logError)return json({error:"Message status was saved, but its delivery log could not be recorded."},500);
+  if(!response.ok)return json({error:"WhatsApp provider rejected the message",provider:result},502);
+  return json({ok:true,provider_message_id:providerId});
+ }catch(error){
+  console.error("send-whatsapp failed",error);
+  return json({error:"Unexpected error. If the provider accepted the message, wait before retrying."},500);
+ }
+});
