@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from'react';
-import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,FileBarChart,Home,LogOut,MessageCircle,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
+import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,Database,FileBarChart,Home,LogOut,MessageCircle,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
 import{supabase,supabaseConfig}from'./supabase';
 import{getCurrentAppSession,loadProfile,logoutAppSession}from'./data';
 import type{Member,Payment,UserProfile}from'./data';
@@ -10,17 +10,18 @@ import{Members,MemberForm,OldMemberForm,MemberProfile}from'./screens/members';
 import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
 import{WhatsApp}from'./screens/whatsapp';
+import{DataBackup}from'./screens/backup';
 import{Finance}from'./screens/finance';
 import{Classes,ClassBookingForm}from'./screens/classes';
 import{Leads}from'./screens/leads';
 import{Notifications,Settings,Staff}from'./screens/admin';
 import{Sheet}from'./components/ui';import{CancelForm,FreezeForm,MessageForm,RenewForm}from'./components/lifecycle';
 
-export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'analytics'|'reports'|'notifications'|'whatsapp'|'settings'|'staff';
+export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'analytics'|'reports'|'notifications'|'whatsapp'|'settings'|'staff'|'backup';
 const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'dashboard',label:'Dashboard',icon:Home},{id:'members',label:'Members',icon:Users},{id:'memberships',label:'Memberships',icon:Package},
  {id:'payments',label:'Payments',icon:WalletCards},{id:'classes',label:'Classes',icon:CalendarDays},{id:'finance',label:'Finance',icon:CircleDollarSign},{id:'leads',label:'Leads',icon:UserPlus},{id:'attendance',label:'Attendance',icon:Check},{id:'analytics',label:'Analytics',icon:BarChart3},
- {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'whatsapp',label:'WhatsApp',icon:MessageCircle},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck}
+ {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'whatsapp',label:'WhatsApp',icon:MessageCircle},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck},{id:'backup',label:'Data backup',icon:Database}
 ];
 export default function App(){
  const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -39,9 +40,10 @@ export default function App(){
 function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:string;setError:(x:string)=>void;onLogout:()=>Promise<void>}){
  const[screen,setScreen]=useState<Screen>('dashboard'),[refresh,setRefresh]=useState(0),[modal,setModal]=useState<{type:string;member?:Member;payment?:Payment;lead?:any;session?:any}|null>(null),[more,setMore]=useState(false);const bump=()=>setRefresh(x=>x+1);
  useEffect(()=>{const fn=(e:Event)=>{const ce=e as CustomEvent;setModal({type:e.type.replace('gym:',''),member:ce.detail})};const names=['gym:open','gym:renew','gym:payment','gym:freeze','gym:cancel','gym:message','gym:class_book'];names.forEach(n=>window.addEventListener(n,fn));const refreshFn=()=>setRefresh(x=>x+1);window.addEventListener('gym:refresh',refreshFn);return()=>{names.forEach(n=>window.removeEventListener(n,fn));window.removeEventListener('gym:refresh',refreshFn)}},[]);
+ const visibleNav=nav.filter(n=>n.id!=='backup'||profile.role==='admin');
  const open=(type:string|{type:string;member?:Member;payment?:Payment;lead?:any;session?:any},member?:Member,payment?:Payment)=>{if(typeof type==='object')setModal(type);else setModal({type,member,payment});};const close=()=>setModal(null);
  const toast=(s:string)=>{setError(s);setTimeout(()=>setError(''),2200)};
- return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{nav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={onLogout}><LogOut size={15}/></button></div></aside>
+ return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{visibleNav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={onLogout}><LogOut size={15}/></button></div></aside>
  <main className="main">{error&&<div className="toast inline-toast">{error}</div>}{screen==='dashboard'&&<Dashboard gymId={profile.gym_id} onNavigate={setScreen} onOpen={open} refresh={refresh}/>}
  {screen==='members'&&<Members gymId={profile.gym_id} refresh={refresh} onRefresh={bump} onOpen={open}/>}
  {screen==='memberships'&&<Memberships gymId={profile.gym_id} refresh={refresh}/>}
@@ -50,10 +52,11 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='whatsapp'&&<WhatsApp gymId={profile.gym_id} refresh={refresh} isAdmin={profile.role==='admin'}/>}
+ {screen==='backup'&&<DataBackup gymId={profile.gym_id} isAdmin={profile.role==='admin'}/ >}
  {screen==='notifications'&&<Notifications gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
- <nav className="mobile-nav"><button className={screen==='dashboard'?'selected':''} onClick={()=>setScreen('dashboard')}><Home size={18}/><span>Home</span></button><button className={screen==='members'?'selected':''} onClick={()=>setScreen('members')}><Users size={18}/><span>Members</span></button><button className={screen==='attendance'?'selected':''} onClick={()=>setScreen('attendance')}><Check size={18}/><span>Attend</span></button><button className={screen==='payments'?'selected':''} onClick={()=>setScreen('payments')}><WalletCards size={18}/><span>Payments</span></button><button className={more?'selected':''} onClick={()=>setMore(true)}><MoreHorizontal size={18}/><span>More</span></button></nav>{more&&<Sheet title="More" onClose={()=>setMore(false)}><div className="mobile-more-grid">{nav.filter(n=>!['dashboard','members','attendance','payments'].includes(n.id)).map(n=>{const I=n.icon;return <button key={n.id} className="quick" onClick={()=>{setMore(false);setScreen(n.id)}}><span><I size={19}/></span><b>{n.label}</b></button>})}</div></Sheet>}
+ <nav className="mobile-nav"><button className={screen==='dashboard'?'selected':''} onClick={()=>setScreen('dashboard')}><Home size={18}/><span>Home</span></button><button className={screen==='members'?'selected':''} onClick={()=>setScreen('members')}><Users size={18}/><span>Members</span></button><button className={screen==='attendance'?'selected':''} onClick={()=>setScreen('attendance')}><Check size={18}/><span>Attend</span></button><button className={screen==='payments'?'selected':''} onClick={()=>setScreen('payments')}><WalletCards size={18}/><span>Payments</span></button><button className={more?'selected':''} onClick={()=>setMore(true)}><MoreHorizontal size={18}/><span>More</span></button></nav>{more&&<Sheet title="More" onClose={()=>setMore(false)}><div className="mobile-more-grid">{visibleNav.filter(n=>!['dashboard','members','attendance','payments'].includes(n.id)).map(n=>{const I=n.icon;return <button key={n.id} className="quick" onClick={()=>{setMore(false);setScreen(n.id)}}><span><I size={19}/></span><b>{n.label}</b></button>})}</div></Sheet>}
  {modal?.type==='old'&&<OldMemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={()=>{close();bump();toast('Old member added')}}/>}
  {modal?.type==='add'&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={(_,notice)=>{close();bump();toast(notice||'Member created')}}/>}
  {modal?.type==='convert_lead'&&modal.lead&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} leadId={modal.lead.id} prefill={{name:modal.lead.name,phone:modal.lead.phone||'',email:modal.lead.email||'',packageId:modal.lead.interested_package_id||'',coach:modal.lead.assigned_to||'',notes:'Converted from CRM lead'}} onClose={close} onSaved={(_,notice)=>{close();bump();toast(notice||'Lead converted to member')}}/>}
