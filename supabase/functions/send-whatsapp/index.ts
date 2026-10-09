@@ -4,6 +4,7 @@ const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"au
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
 const sha256=async(value:string)=>{const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes)).map(x=>x.toString(16).padStart(2,"0")).join("")};
 const scalarBool=(v:any)=>Array.isArray(v)?v[0]===true:v===true;
+const normalizeWhatsappNumber=(value:unknown)=>{const digits=String(value??"").replace(/\D/g,"");if(digits.length===10)return "91"+digits;if(digits.length===11&&digits.startsWith("0"))return "91"+digits.slice(1);if(digits.length>=11&&digits.length<=15)return digits;return ""};
 
 Deno.serve(async req=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
@@ -34,8 +35,8 @@ Deno.serve(async req=>{
   if(n.status==="sent"||n.delivery_status==="delivered"||n.delivery_status==="read")return json({ok:true,already_sent:true});
   if(!["queued","failed"].includes(n.status)||Number(n.retry_count??0)>=3)return json({error:"This message is no longer eligible to send"},409);
 
-  const phone=String(n.members?.phone??"").replace(/\D/g,"");
-  if(!phone)return json({error:"Member has no WhatsApp/mobile number"},400);
+  const phone=normalizeWhatsappNumber(n.members?.phone);
+  if(!phone)return json({error:"Member phone number is invalid for WhatsApp. Use a 10-digit Indian number or include the international country calling code."},400);
 
   const{data:cx,error:connectionError}=await db.rpc("get_whatsapp_credentials_internal",{p_gym_id:n.gym_id});
   if(connectionError)return json({error:"Unable to load WhatsApp connection"},500);
