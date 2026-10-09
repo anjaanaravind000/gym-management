@@ -48,10 +48,30 @@ Deno.serve(async req=>{
 
   // If fetch times out, leave the lease to expire automatically. This blocks competing sends
   // for five minutes because Meta may have accepted the message even if the response was lost.
-  const response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
-   method:"POST",headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
-   body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}})
-  });
+  let response:Response;
+  try{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+   try{
+    response=await fetch("https://graph.facebook.com/"+connection.api_version+"/"+connection.phone_number_id+"/messages",{
+     method:"POST",headers:{Authorization:"Bearer "+connection.access_token,"Content-Type":"application/json"},
+     body:JSON.stringify({messaging_product:"whatsapp",to:phone,type:"text",text:{preview_url:false,body:n.message_body??"Please contact your gym regarding your membership."}}),
+     signal:controller.signal
+    });
+   }finally{clearTimeout(timer)}
+  }catch(fetchError){
+   const errorMessage="Message delivery timed out or the network closed before Meta returned a result. Delivery is unconfirmed; this attempt was not automatically retried to avoid a duplicate. Check WhatsApp Manager before sending again.";
+   const{error:finishError}=await db.rpc("finish_whatsapp_notification_internal",{
+    p_notification_id:notificationId,p_provider_message_id:null,p_success:false,
+    p_error_message:errorMessage,p_previous_retry_count:2
+   });
+   if(finishError){
+    await db.from("notifications").update({status:"failed",delivery_status:"failed",error_message:errorMessage,retry_count:3}).eq("id",notificationId);
+    await db.from("notification_logs").insert({notification_id:notificationId,status:"failed",delivery_status:"failed",error_message:errorMessage});
+    await db.rpc("release_whatsapp_notification_internal",{p_notification_id:notificationId});
+   }
+   console.error("WhatsApp request timed out or lost connection; automatic retry disabled",notificationId,fetchError);
+   return json({error:errorMessage,delivery_status:"unconfirmed"},504);
+  }
   const result=await response.json(),providerId=result?.messages?.[0]?.id??null;
   const errorMessage=response.ok?null:JSON.stringify(result);
   const{error:finishError}=await db.rpc("finish_whatsapp_notification_internal",{
