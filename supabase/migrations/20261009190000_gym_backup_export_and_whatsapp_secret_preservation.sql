@@ -60,6 +60,28 @@ begin
 end
 $function$;
 
+create or replace function public.get_whatsapp_credentials_internal(p_gym_id uuid)
+returns table(phone_number_id text,access_token text,api_version text,enabled boolean,last_test_ok boolean)
+language sql security definer
+set search_path to 'private','pg_catalog'
+as $function$
+ select c.phone_number_id,c.access_token,c.api_version,c.enabled,c.last_test_ok
+ from private.whatsapp_connections c where c.gym_id=p_gym_id limit 1
+$function$;
+revoke all on function public.get_whatsapp_credentials_internal(uuid) from public,anon,authenticated;
+grant execute on function public.get_whatsapp_credentials_internal(uuid) to service_role;
+
+create or replace function public.get_whatsapp_app_secrets_internal()
+returns table(meta_app_secret text)
+language sql security definer
+set search_path to 'private','pg_catalog'
+as $function$
+ select c.meta_app_secret from private.whatsapp_connections c
+ where c.enabled=true and c.meta_app_secret is not null
+$function$;
+revoke all on function public.get_whatsapp_app_secrets_internal() from public,anon,authenticated;
+grant execute on function public.get_whatsapp_app_secrets_internal() to service_role;
+
 create or replace function public.export_gym_backup(p_gym_id uuid)
 returns jsonb
 language plpgsql
