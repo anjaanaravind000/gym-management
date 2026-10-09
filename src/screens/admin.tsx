@@ -1,10 +1,67 @@
 import React,{useEffect,useState}from'react';
 import{Bell,Edit3,MessageCircle,Plus,RefreshCw,ShieldCheck,UserPlus}from'lucide-react';
-import{loadGym,loadGymSettings,loadNotificationLogs,loadNotifications,loadPackages,loadPaymentMethodSettings,loadPermissions,loadStaff,loadStaffPermissions,loadTemplates,markNotificationRead,notificationCounts,queueNotification,saveGym,saveGymSettings,savePackage,savePaymentMethod,saveTemplate,setStaffPermission,setStaffRole}from'../data';
+import{loadGym,loadGymSettings,loadNotificationLogs,loadNotifications,loadPackages,loadPaymentMethodSettings,loadPermissions,loadStaff,loadStaffPermissions,loadTemplates,markNotificationRead,notificationCounts,saveGym,saveGymSettings,savePackage,savePaymentMethod,saveTemplate,setStaffPermission,setStaffRole}from'../data';
 import type{Gym,GymSettings,Package,Staff,Template}from'../data';
 import{DataTable,Empty,Field,Panel,PageHeader,Sheet,StatusTag,Toggle,humanError,money}from'../components/ui';
 
-export function Notifications({gymId,refresh}:{gymId:string;refresh:number}){const[rows,setRows]=useState<any[]>([]),[logs,setLogs]=useState<any[]>([]),[tab,setTab]=useState('center'),[counts,setCounts]=useState<any>({unread:0,queued:0,failed:0}),[error,setError]=useState('');const load=()=>Promise.all([loadNotifications(gymId,0,50),loadNotificationLogs(gymId,0,50),notificationCounts(gymId)]).then(([a,b,c])=>{setRows(a.rows);setLogs(b.rows);setCounts(c)}).catch(x=>setError(humanError(x)));useEffect(()=>{load()},[gymId,refresh]);return <><PageHeader title="Notifications" subtitle="Expiry alerts, payments, renewals and WhatsApp delivery." action={<button className="icon-button" onClick={load}><RefreshCw size={18}/></button>}/><div className="summary-strip"><SummaryCard title="Unread" value={counts.unread}/><SummaryCard title="Queued" value={counts.queued}/><SummaryCard title="Failed" value={counts.failed}/></div><div className="segmented"><button className={tab==='center'?'active':''} onClick={()=>setTab('center')}>Notification center</button><button className={tab==='logs'?'active':''} onClick={()=>setTab('logs')}>WhatsApp logs</button></div>{error&&<div className="error-inline">{error}</div>}{tab==='center'?<div className="notification-list">{rows.map(n=><div className={n.read_at?'notification-row':'notification-row unread'} key={n.id}><div className="notification-icon"><Bell size={17}/></div><div><b>{n.members?.name||n.notification_type}</b><span>{n.message_body||n.notification_type} · {n.channel}</span><small>{new Date(n.created_at).toLocaleString('en-IN')} · {n.status}{n.channel==='whatsapp'&&n.delivery_status?' · '+n.delivery_status:''}{n.error_message?' · '+n.error_message:''}</small>{n.channel==='whatsapp'&&n.status==='queued'&&<small>Queued for background delivery. Do not send again while this message is queued.</small></div><div className="row-actions">{!n.read_at&&<button className="text-button" onClick={()=>markNotificationRead(gymId,n.id).then(load).catch((e:any)=>setError(humanError(e)))}>Mark read</button>}</div></div>)}{!rows.length&&<Empty title="No notifications" text="Automated expiry and business notifications will appear here."/>}</div>:<DataTable rows={logs.map((l:any)=>({Member:l.notifications?.members?.name||'—',Type:l.notifications?.notification_type||'—',Channel:l.notifications?.channel||'—',Attempt:l.attempt_at,Status:l.status,Delivery:l.delivery_status||'—',Error:l.error_message||'—'}))}/>}</>}
+export function Notifications({gymId,refresh}:{gymId:string;refresh:number}){
+ const[rows,setRows]=useState<any[]>([]);
+ const[logs,setLogs]=useState<any[]>([]);
+ const[tab,setTab]=useState('center');
+ const[counts,setCounts]=useState<any>({unread:0,queued:0,failed:0});
+ const[error,setError]=useState('');
+ const load=()=>Promise.all([
+  loadNotifications(gymId,0,50),
+  loadNotificationLogs(gymId,0,50),
+  notificationCounts(gymId)
+ ]).then(([notifications,deliveryLogs,summary])=>{
+  setRows(notifications.rows);
+  setLogs(deliveryLogs.rows);
+  setCounts(summary);
+  setError('');
+ }).catch((e:any)=>setError(humanError(e)));
+ useEffect(()=>{load()},[gymId,refresh]);
+ return <>
+  <PageHeader title="Notifications" subtitle="Expiry alerts, payments, renewals and WhatsApp delivery." action={<button className="icon-button" onClick={load}><RefreshCw size={18}/></button>}/>
+  <div className="summary-strip">
+   <SummaryCard title="Unread" value={counts.unread}/>
+   <SummaryCard title="Queued" value={counts.queued}/>
+   <SummaryCard title="Failed" value={counts.failed}/>
+  </div>
+  <div className="segmented">
+   <button className={tab==='center'?'active':''} onClick={()=>setTab('center')}>Notification center</button>
+   <button className={tab==='logs'?'active':''} onClick={()=>setTab('logs')}>WhatsApp logs</button>
+  </div>
+  {error&&<div className="error-inline">{error}</div>}
+  {tab==='center'?<div className="notification-list">
+   {rows.map((n:any)=><div className={n.read_at?'notification-row':'notification-row unread'} key={n.id}>
+    <div className="notification-icon"><Bell size={17}/></div>
+    <div>
+     <b>{n.members?.name||n.notification_type}</b>
+     <span>{n.message_body||n.notification_type} · {n.channel}</span>
+     <small>
+      {new Date(n.created_at).toLocaleString('en-IN')} · {n.status}
+      {n.channel==='whatsapp'&&n.delivery_status?' · '+n.delivery_status:''}
+      {n.error_message?' · '+n.error_message:''}
+     </small>
+     {n.channel==='whatsapp'&&n.status==='queued'&&<small>Queued for background delivery. Do not submit the same message again while it is queued.</small>}
+    </div>
+    <div className="row-actions">
+     {!n.read_at&&<button className="text-button" onClick={()=>markNotificationRead(gymId,n.id).then(load).catch((e:any)=>setError(humanError(e)))}>Mark read</button>}
+    </div>
+   </div>)}
+   {!rows.length&&<Empty title="No notifications" text="Automated expiry and business notifications will appear here."/>}
+  </div>:<DataTable rows={logs.map((l:any)=>({
+   Member:l.notifications?.members?.name||'—',
+   Type:l.notifications?.notification_type||'—',
+   Channel:l.notifications?.channel||'—',
+   Attempt:l.attempt_at,
+   Status:l.status,
+   Delivery:l.delivery_status||'—',
+   Error:l.error_message||'—'
+  }))}/>}
+ </>;
+}
 function SummaryCard({title,value}:{title:string;value:any}){return <div className="summary-item"><span>{title}</span><b>{value}</b></div>}
 
 export function Settings({gymId,refresh}:{gymId:string;refresh:number}){const[tab,setTab]=useState('gym'),[gym,setGym]=useState<Gym|null>(null),[settings,setSettings]=useState<GymSettings|null>(null),[methods,setMethods]=useState<any[]>([]),[packages,setPackages]=useState<Package[]>([]),[templates,setTemplates]=useState<Template[]>([]),[editing,setEditing]=useState<Package|null>(null),[msg,setMsg]=useState(''),[error,setError]=useState('');const load=()=>Promise.all([loadGym(gymId),loadGymSettings(gymId),loadPaymentMethodSettings(gymId),loadPackages(gymId,true),loadTemplates(gymId)]).then(([a,b,c,d,e])=>{setGym(a);setSettings(b);setMethods(c);setPackages(d);setTemplates(e)}).catch((x:any)=>setError(humanError(x)));useEffect(()=>{load()},[gymId,refresh]);if(!gym||!settings)return <Empty title="Loading settings…" text=""/>;return <><PageHeader title="Settings" subtitle="Gym profile, payment methods, packages and automation."/>{error&&<div className="error-banner">{error}<button onClick={()=>setError('')}>Dismiss</button></div>}<div className="settings-tabs">{[['gym','Gym'],['notifications','Notifications'],['methods','Payment methods'],['packages','Packages'],['templates','Templates']].map(x=><button className={tab===x[0]?'active':''} key={x[0]} onClick={()=>setTab(x[0])}>{x[1]}</button>)}</div>{msg&&<div className="success-banner">{msg}</div>}{tab==='gym'&&<Panel title="Gym profile"><div className="form-grid"><Field label="Gym name"><input value={gym.name} onChange={e=>setGym({...gym,name:e.target.value})}/></Field><Field label="Phone"><input value={gym.phone||''} onChange={e=>setGym({...gym,phone:e.target.value})}/></Field><Field label="WhatsApp"><input value={gym.whatsapp||''} onChange={e=>setGym({...gym,whatsapp:e.target.value})}/></Field><Field label="Email"><input value={gym.email||''} onChange={e=>setGym({...gym,email:e.target.value})}/></Field><Field label="GST"><input value={gym.gst_number||''} onChange={e=>setGym({...gym,gst_number:e.target.value})}/></Field><Field label="Currency"><input value={gym.currency} onChange={e=>setGym({...gym,currency:e.target.value.toUpperCase()})}/></Field><Field label="Timezone"><input value={gym.timezone} onChange={e=>setGym({...gym,timezone:e.target.value})}/></Field><Field label="Member ID prefix"><input value={gym.member_id_prefix} onChange={e=>setGym({...gym,member_id_prefix:e.target.value.toUpperCase()})}/></Field><Field label="Grace period (days)"><input type="number" min="0" value={gym.renewal_grace_days} onChange={e=>setGym({...gym,renewal_grace_days:Number(e.target.value)})}/></Field><Field label="Opening"><input type="time" value={gym.opening_time||''} onChange={e=>setGym({...gym,opening_time:e.target.value})}/></Field><Field label="Closing"><input type="time" value={gym.closing_time||''} onChange={e=>setGym({...gym,closing_time:e.target.value})}/></Field></div><Field label="Address"><textarea value={gym.address||''} onChange={e=>setGym({...gym,address:e.target.value})}/></Field><button className="primary" onClick={()=>saveGym(gymId,gym).then(()=>{setMsg('Gym settings saved');setError('')}).catch((x:any)=>setError(humanError(x)))}>Save gym settings</button></Panel>}{tab==='notifications'&&<Panel title="Automation"><Toggle label="10-day reminder" checked={settings.expiry_reminder_10_days} onChange={v=>setSettings({...settings,expiry_reminder_10_days:v})}/><Toggle label="5-day reminder" checked={settings.expiry_reminder_5_days} onChange={v=>setSettings({...settings,expiry_reminder_5_days:v})}/><Toggle label="Expiry-day reminder" checked={settings.expiry_reminder_today} onChange={v=>setSettings({...settings,expiry_reminder_today:v})}/><Toggle label="Payment reminders" checked={settings.payment_reminders} onChange={v=>setSettings({...settings,payment_reminders:v})}/><Toggle label="Admin alerts" checked={settings.admin_alerts} onChange={v=>setSettings({...settings,admin_alerts:v})}/><Toggle label="WhatsApp" checked={settings.whatsapp_enabled} onChange={v=>setSettings({...settings,whatsapp_enabled:v})}/><Toggle label="Email" checked={settings.email_enabled} onChange={v=>setSettings({...settings,email_enabled:v})}/><Toggle label="Push" checked={settings.push_enabled} onChange={v=>setSettings({...settings,push_enabled:v})}/><button className="primary" onClick={()=>saveGymSettings(gymId,settings).then(()=>{setMsg('Notification settings saved');setError('')}).catch((x:any)=>setError(humanError(x)))}>Save</button></Panel>}{tab==='methods'&&<Panel title="Payment methods">{methods.map(x=><Toggle key={x.payment_method} label={x.payment_method} checked={x.enabled} onChange={v=>{setMethods(ms=>ms.map(a=>a.payment_method===x.payment_method?{...a,enabled:v}:a));savePaymentMethod(gymId,x.payment_method,v).catch((e:any)=>{setMethods(ms=>ms.map(a=>a.payment_method===x.payment_method?{...a,enabled:x.enabled}:a));setError(humanError(e))})}}/>)}</Panel>}{tab==='packages'&&<Panel title="Membership packages" extra={<button className="primary small" onClick={()=>setEditing({id:'',gym_id:gymId,name:'',duration_months:1,duration_unit:'month',price:0,description:'',status:'active',display_order:packages.length+1})}><Plus size={15}/> Add package</button>}><div className="package-grid">{packages.map(p=><div className="package-card" key={p.id}><div><b>{p.name}</b><span>{p.duration_months} {p.duration_unit}</span></div><strong>{money(p.price)}</strong><div className="row-actions"><StatusTag value={p.status}/><button className="icon-button mini" onClick={()=>setEditing(p)}><Edit3 size={14}/></button></div></div>)}</div>{editing&&<PackageEditor gymId={gymId} initial={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load()}}/>}</Panel>}{tab==='templates'&&<Panel title="Message templates"><div className="template-list">{templates.map(t=><div className="template-card" key={t.id}><div className="section-title"><b>{t.notification_type} · {t.channel}</b><Toggle checked={t.enabled} onChange={v=>setTemplates(x=>x.map(a=>a.id===t.id?{...a,enabled:v}:a))}/></div><Field label="Message"><textarea rows={4} value={t.body} onChange={e=>setTemplates(x=>x.map(a=>a.id===t.id?{...a,body:e.target.value}:a))}/></Field>{t.channel==='whatsapp'&&<Field label="Approved template variables (comma separated)"><input value={(t.provider_template_variables||[]).join(', ')} onChange={e=>setTemplates(x=>x.map(a=>a.id===t.id?{...a,provider_template_variables:e.target.value.split(',').map(v=>v.trim()).filter(Boolean)}:a))} placeholder="member_name, expiry_date"/></Field>}<button className="secondary small" onClick={()=>saveTemplate(t.id,t).then(load).catch((e:any)=>setError(humanError(e)))}>Save</button></div>)}</div></Panel>}</>}
