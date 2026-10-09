@@ -136,3 +136,29 @@ end
 $function$;
 revoke all on function public.export_gym_backup(uuid) from public,authenticated,anon;
 grant execute on function public.export_gym_backup(uuid) to anon,authenticated;
+
+-- Keep report objects read-only through the API and enforce base-table RLS.
+alter view public.attendance_report set (security_invoker=true);
+alter view public.class_timetable_report set (security_invoker=true);
+alter view public.coach_performance_report set (security_invoker=true);
+alter view public.did_not_renew_report set (security_invoker=true);
+alter view public.expired_members_report set (security_invoker=true);
+alter view public.expiring_members_report set (security_invoker=true);
+alter view public.member_class_bookings_report set (security_invoker=true);
+alter view public.member_report set (security_invoker=true);
+alter view public.membership_payment_summary set (security_invoker=true);
+alter view public.outstanding_payment_report set (security_invoker=true);
+alter view public.package_performance_report set (security_invoker=true);
+alter view public.renewal_report set (security_invoker=true);
+alter view public.revenue_report set (security_invoker=true);
+
+revoke all on table public.attendance_report,public.class_timetable_report,public.coach_performance_report,
+ public.did_not_renew_report,public.expired_members_report,public.expiring_members_report,
+ public.member_class_bookings_report,public.member_report,public.membership_payment_summary,
+ public.outstanding_payment_report,public.package_performance_report,public.renewal_report,
+ public.revenue_report from anon,authenticated;
+grant select on table public.attendance_report,public.class_timetable_report,public.coach_performance_report,
+ public.did_not_renew_report,public.expired_members_report,public.expiring_members_report,
+ public.member_class_bookings_report,public.member_report,public.membership_payment_summary,
+ public.outstanding_payment_report,public.package_performance_report,public.renewal_report,
+ public.revenue_report to anon,authenticated;
