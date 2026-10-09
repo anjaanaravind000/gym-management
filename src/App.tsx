@@ -52,7 +52,7 @@ function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:stri
  {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='whatsapp'&&<WhatsApp gymId={profile.gym_id} refresh={refresh} isAdmin={profile.role==='admin'}/>}
- {screen==='backup'&&<DataBackup gymId={profile.gym_id} isAdmin={profile.role==='admin'}/ >}
+ {screen==='backup'&&<DataBackup gymId={profile.gym_id} isAdmin={profile.role==='admin'}/>}
  {screen==='notifications'&&<Notifications gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
