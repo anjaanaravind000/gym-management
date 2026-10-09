@@ -24,17 +24,31 @@ const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'whatsapp',label:'WhatsApp',icon:MessageCircle},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck},{id:'backup',label:'Data backup',icon:Database}
 ];
 export default function App(){
- const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[profileLoadError,setProfileLoadError]=useState('');
+ async function resolveProfile(s:any){
+  try{
+   const loaded=await loadProfile(s.user_id);
+   setProfile(loaded);
+   if(!loaded&&s.gym_id)setProfileLoadError('Your login is linked to a gym, but your staff profile could not be loaded. Retry or sign out; do not create a second gym.');
+   else setProfileLoadError('');
+  }catch(e:any){
+   setProfile(null);
+   setProfileLoadError(humanError(e));
+   setError(humanError(e));
+  }
+ }
  useEffect(()=>{if(!supabase){setLoading(false);return}let live=true;
-  getCurrentAppSession().then(async s=>{if(!live)return;if(s){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}setLoading(false)}).catch((e:any)=>{if(!live)return;setError(humanError(e));setLoading(false)});
+  getCurrentAppSession().then(async s=>{if(!live)return;if(s){setSession(s);await resolveProfile(s)}setLoading(false)}).catch((e:any)=>{if(!live)return;setError(humanError(e));setLoading(false)});
   return()=>{live=false};
  },[]);
- async function signedIn(s:any){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}
- async function signOut(){await logoutAppSession();setSession(null);setProfile(null)}
+ async function signedIn(s:any){setSession(s);await resolveProfile(s)}
+ async function retryProfile(){if(session)await resolveProfile(session)}
+ async function signOut(){await logoutAppSession();setSession(null);setProfile(null);setProfileLoadError('')}
  if(!supabase)return <Config config={supabaseConfig}/>;
  if(loading)return <AuthWrap title="Loading your gym"><p>Checking secure session…</p></AuthWrap>;
  if(!session)return <AuthScreen onSignedIn={signedIn}/>;
- if(!profile)return <SetupScreen user={session} onDone={async()=>setProfile(await loadProfile(session.user_id))}/>;
+ if(!profile&&(profileLoadError||session.gym_id))return <AuthWrap title="Unable to load your gym profile"><p>{profileLoadError||'Your login is linked to a gym, but no staff profile was returned.'}</p><button className="primary full" onClick={retryProfile}>Retry</button><button className="secondary full" onClick={signOut}>Sign out</button></AuthWrap>;
+ if(!profile)return <SetupScreen user={session} onDone={async()=>resolveProfile({...session,gym_id:session.gym_id})}/>;
  return <Shell profile={profile} error={error} setError={setError} onLogout={signOut}/>
 }
 function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:string;setError:(x:string)=>void;onLogout:()=>Promise<void>}){
