@@ -19,7 +19,7 @@ function InvitePanel({gymId,onClose,onSaved}:{gymId:string;onClose:()=>void;onSa
   <div className="form-grid">
    <Field label="Name"><input required value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></Field>
    <Field label="Username"><input required minLength={3} maxLength={32} pattern="[A-Za-z0-9._-]{3,32}" value={f.username} onChange={e=>setF({...f,username:e.target.value})} autoComplete="off"/></Field>
-   <Field label="Password"><input required minLength={8} type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})} autoComplete="new-password"/></Field>
+   <Field label="Password"><input required minLength={12} pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{12,}" type="password" value={f.password} onChange={e=>setF({...f,password:e.target.value})} autoComplete="new-password"/><small className="field-help">Use at least 12 characters with uppercase, lowercase, a number and a symbol.</small></Field>
    <Field label="Email"><input type="email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></Field>
    <Field label="Phone"><input value={f.phone} onChange={e=>setF({...f,phone:e.target.value})}/></Field>
    <Field label="Role"><select value={f.role} onChange={e=>setF({...f,role:e.target.value})}><option value="coach">Coach</option><option value="staff">Staff</option></select></Field>
