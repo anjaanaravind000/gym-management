@@ -15,7 +15,7 @@ begin
   if position(v_old in v_sql)=0 then raise exception 'Could not locate create_renewal declaration'; end if;
   v_sql := replace(v_sql,v_old,v_new);
 
-  v_old := 'if not private.has_permission(p_gym_id,''members.renew'') then raise exception ''Unauthorized''; end if;';
+  v_old := 'if p_amount_paid is null or p_amount_paid<0 then raise exception ''Invalid amount paid''; end if;';
   v_new := v_old || E'\n'
     || 'perform 1 from public.members where id=p_member_id and gym_id=p_gym_id for update;'
     || E'\n' || 'if not found then raise exception ''Member not found''; end if;'
@@ -44,7 +44,7 @@ begin
     || E'\n' || '  raise exception ''Transaction reference already exists'';'
     || E'\n' || ' end if;'
     || E'\n' || 'end if;';
-  if position(v_old in v_sql)=0 then raise exception 'Could not locate create_renewal authorization guard'; end if;
+  if position(v_old in v_sql)=0 then raise exception 'Could not locate create_renewal payment validation'; end if;
   v_sql := replace(v_sql,v_old,v_new);
 
   v_old := 'if v_old.status=''cancelled'' then raise exception ''Cancelled memberships cannot be renewed''; end if;';
