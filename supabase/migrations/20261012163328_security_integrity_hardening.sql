@@ -1,0 +1,2 @@
+-- Historical no-op migration entry created before the security hardening SQL was applied.
+-- The complete hardening is versioned in the following security_integrity_hardening_v2 migration.
