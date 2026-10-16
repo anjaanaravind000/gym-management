@@ -448,7 +448,7 @@ th,td{border-bottom-color:#202a22}
 
 /* Keep sidebar actions reachable on short laptop windows and vertically compact displays. */
 @media(max-height:560px) and (min-width:721px){
- .sidebar{padding-top:10px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+ .sidebar{padding-top:10px;padding-bottom:max(42px,env(safe-area-inset-bottom))}
  .brand{padding-bottom:12px}
  .brand-mark{height:32px;width:32px}
  .sidebar nav{gap:3px}
