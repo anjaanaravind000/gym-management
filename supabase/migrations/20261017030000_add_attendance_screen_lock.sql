@@ -10,6 +10,10 @@ create table if not exists private.attendance_screen_locks (
 );
 
 alter table private.attendance_screen_locks enable row level security;
+drop policy if exists "deny direct kiosk lock access" on private.attendance_screen_locks;
+create policy "deny direct kiosk lock access"
+  on private.attendance_screen_locks for all to public
+  using (false) with check (false);
 revoke all on table private.attendance_screen_locks from public, anon, authenticated;
 
 create or replace function private.attendance_screen_lock_status(p_gym_id uuid)
