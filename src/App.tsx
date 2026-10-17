@@ -1,5 +1,5 @@
 import React,{useEffect,useState}from'react';
-import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,Database,FileBarChart,Home,LogOut,MessageCircle,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,Users,WalletCards}from'lucide-react';
+import{Activity,BarChart3,Bell,CalendarDays,Check,CircleDollarSign,Database,FileBarChart,Home,LogOut,MessageCircle,MoreHorizontal,Package,Settings as SettingsIcon,ShieldCheck,UserPlus,UserCheck,Users,WalletCards}from'lucide-react';
 import{supabase,supabaseConfig}from'./supabase';
 import{getCurrentAppSession,loadProfile,logoutAppSession}from'./data';
 import type{Member,Payment,UserProfile}from'./data';
@@ -7,7 +7,7 @@ import{Brand,humanError}from'./components/ui';
 import{AuthScreen,SetupScreen}from'./components/auth';
 import{Dashboard}from'./screens/dashboard';
 import{Members,MemberForm,OldMemberForm,MemberProfile}from'./screens/members';
-import{Attendance,Memberships,PaymentForm,Payments}from'./screens/operations';
+import{Attendance,MemberCheckInOut,Memberships,PaymentForm,Payments,UnlockAttendanceScreenDialog}from'./screens/operations';
 import{Analytics,Reports}from'./screens/reports';
 import{WhatsApp}from'./screens/whatsapp';
 import{DataBackup}from'./screens/backup';
@@ -17,46 +17,66 @@ import{Leads}from'./screens/leads';
 import{Notifications,Settings,Staff}from'./screens/admin';
 import{Sheet}from'./components/ui';import{CancelForm,FreezeForm,MessageForm,RenewForm}from'./components/lifecycle';
 
-export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'analytics'|'reports'|'notifications'|'whatsapp'|'settings'|'staff'|'backup';
+const KIOSK_LOCK_STORAGE_KEY='gym_member_checkin_kiosk_locked';
+export type Screen='dashboard'|'members'|'memberships'|'payments'|'finance'|'leads'|'classes'|'attendance'|'member-checkin'|'analytics'|'reports'|'notifications'|'whatsapp'|'settings'|'staff'|'backup';
 const nav:{id:Screen;label:string;icon:React.ElementType}[]=[
  {id:'dashboard',label:'Dashboard',icon:Home},{id:'members',label:'Members',icon:Users},{id:'memberships',label:'Memberships',icon:Package},
- {id:'payments',label:'Payments',icon:WalletCards},{id:'classes',label:'Classes',icon:CalendarDays},{id:'finance',label:'Finance',icon:CircleDollarSign},{id:'leads',label:'Leads',icon:UserPlus},{id:'attendance',label:'Attendance',icon:Check},{id:'analytics',label:'Analytics',icon:BarChart3},
+ {id:'payments',label:'Payments',icon:WalletCards},{id:'classes',label:'Classes',icon:CalendarDays},{id:'finance',label:'Finance',icon:CircleDollarSign},{id:'leads',label:'Leads',icon:UserPlus},{id:'attendance',label:'Attendance',icon:Check},{id:'member-checkin',label:'Members Check In / Out',icon:UserCheck},{id:'analytics',label:'Analytics',icon:BarChart3},
  {id:'reports',label:'Reports',icon:FileBarChart},{id:'notifications',label:'Notifications',icon:Bell},{id:'whatsapp',label:'WhatsApp',icon:MessageCircle},{id:'settings',label:'Settings',icon:SettingsIcon},{id:'staff',label:'Staff',icon:ShieldCheck},{id:'backup',label:'Data backup',icon:Database}
 ];
 export default function App(){
- const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const[session,setSession]=useState<any>(null),[profile,setProfile]=useState<UserProfile|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[profileLoadError,setProfileLoadError]=useState('');
+ async function resolveProfile(s:any){
+  try{
+   const loaded=await loadProfile(s.user_id);
+   setProfile(loaded);
+   if(!loaded&&s.gym_id)setProfileLoadError('Your login is linked to a gym, but your staff profile could not be loaded. Retry or sign out; do not create a second gym.');
+   else setProfileLoadError('');
+  }catch(e:any){
+   setProfile(null);
+   setProfileLoadError(humanError(e));
+   setError(humanError(e));
+  }
+ }
  useEffect(()=>{if(!supabase){setLoading(false);return}let live=true;
-  getCurrentAppSession().then(async s=>{if(!live)return;if(s){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}setLoading(false)}).catch((e:any)=>{if(!live)return;setError(humanError(e));setLoading(false)});
+  getCurrentAppSession().then(async s=>{if(!live)return;if(s){setSession(s);await resolveProfile(s)}setLoading(false)}).catch((e:any)=>{if(!live)return;setError(humanError(e));setLoading(false)});
   return()=>{live=false};
  },[]);
- async function signedIn(s:any){setSession(s);try{setProfile(await loadProfile(s.user_id))}catch(e:any){setError(humanError(e))}}
- async function signOut(){await logoutAppSession();setSession(null);setProfile(null)}
+ async function signedIn(s:any){setSession(s);await resolveProfile(s)}
+ async function retryProfile(){if(session)await resolveProfile(session)}
+ async function signOut(){await logoutAppSession();setSession(null);setProfile(null);setProfileLoadError('')}
  if(!supabase)return <Config config={supabaseConfig}/>;
  if(loading)return <AuthWrap title="Loading your gym"><p>Checking secure session…</p></AuthWrap>;
  if(!session)return <AuthScreen onSignedIn={signedIn}/>;
- if(!profile)return <SetupScreen user={session} onDone={async()=>setProfile(await loadProfile(session.user_id))}/>;
+ if(!profile&&(profileLoadError||session.gym_id))return <AuthWrap title="Unable to load your gym profile"><p>{profileLoadError||'Your login is linked to a gym, but no staff profile was returned.'}</p><button className="primary full" onClick={retryProfile}>Retry</button><button className="secondary full" onClick={signOut}>Sign out</button></AuthWrap>;
+ if(!profile)return <SetupScreen user={session} onDone={async()=>resolveProfile({...session,gym_id:session.gym_id})}/>;
  return <Shell profile={profile} error={error} setError={setError} onLogout={signOut}/>
 }
 function Shell({profile,error,setError,onLogout}:{profile:UserProfile;error:string;setError:(x:string)=>void;onLogout:()=>Promise<void>}){
- const[screen,setScreen]=useState<Screen>('dashboard'),[refresh,setRefresh]=useState(0),[modal,setModal]=useState<{type:string;member?:Member;payment?:Payment;lead?:any;session?:any}|null>(null),[more,setMore]=useState(false);const bump=()=>setRefresh(x=>x+1);
+ const[screen,setScreen]=useState<Screen>('dashboard'),[refresh,setRefresh]=useState(0),[modal,setModal]=useState<{type:string;member?:Member;payment?:Payment;lead?:any;session?:any}|null>(null),[more,setMore]=useState(false),[kioskLocked,setKioskLocked]=useState(()=>{try{return sessionStorage.getItem(KIOSK_LOCK_STORAGE_KEY)==='true'}catch{return false}}),[unlockOpen,setUnlockOpen]=useState(false);const bump=()=>setRefresh(x=>x+1);
  useEffect(()=>{const fn=(e:Event)=>{const ce=e as CustomEvent;setModal({type:e.type.replace('gym:',''),member:ce.detail})};const names=['gym:open','gym:renew','gym:payment','gym:freeze','gym:cancel','gym:message','gym:class_book'];names.forEach(n=>window.addEventListener(n,fn));const refreshFn=()=>setRefresh(x=>x+1);window.addEventListener('gym:refresh',refreshFn);return()=>{names.forEach(n=>window.removeEventListener(n,fn));window.removeEventListener('gym:refresh',refreshFn)}},[]);
  const visibleNav=nav.filter(n=>n.id!=='backup'||profile.role==='admin');
  const open=(type:string|{type:string;member?:Member;payment?:Payment;lead?:any;session?:any},member?:Member,payment?:Payment)=>{if(typeof type==='object')setModal(type);else setModal({type,member,payment});};const close=()=>setModal(null);
  const toast=(s:string)=>{setError(s);setTimeout(()=>setError(''),2200)};
+ const enterKiosk=()=>{try{sessionStorage.setItem(KIOSK_LOCK_STORAGE_KEY,'true')}catch{}setScreen('member-checkin');setModal(null);setMore(false);setKioskLocked(true)};
+ const requestUnlock=()=>setUnlockOpen(true);
+ const finishUnlock=()=>{try{sessionStorage.removeItem(KIOSK_LOCK_STORAGE_KEY)}catch{}setUnlockOpen(false);setKioskLocked(false);setScreen('member-checkin')};
+ if(kioskLocked)return <div className="app-shell kiosk-locked"><main className="main kiosk-main"><MemberCheckInOut gymId={profile.gym_id} refresh={refresh} locked={true} onLock={enterKiosk} onUnlockRequest={requestUnlock}/></main>{unlockOpen&&<UnlockAttendanceScreenDialog gymId={profile.gym_id} onCancel={()=>setUnlockOpen(false)} onUnlocked={finishUnlock}/>}</div>;
  return <div className="app-shell"><aside className="sidebar"><Brand/><nav>{visibleNav.map(n=>{const I=n.icon;return <button key={n.id} className={screen===n.id?'nav-item active':'nav-item'} onClick={()=>setScreen(n.id)}><I size={19}/><span>{n.label}</span></button>})}</nav><div className="profile"><div className="avatar">{initials(profile.name)}</div><div><b>{profile.name}</b><span>{profile.role}</span></div><button className="icon-button mini" onClick={onLogout}><LogOut size={15}/></button></div></aside>
  <main className="main">{error&&<div className="toast inline-toast">{error}</div>}{screen==='dashboard'&&<Dashboard gymId={profile.gym_id} onNavigate={setScreen} onOpen={open} refresh={refresh}/>}
  {screen==='members'&&<Members gymId={profile.gym_id} refresh={refresh} onRefresh={bump} onOpen={open}/>}
  {screen==='memberships'&&<Memberships gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='payments'&&<Payments gymId={profile.gym_id} refresh={refresh} onOpen={open}/>} {screen==='finance'&&<Finance gymId={profile.gym_id} refresh={refresh}/>} {screen==='leads'&&<Leads gymId={profile.gym_id} refresh={refresh} onConvert={lead=>open({type:'convert_lead',lead})}/>} {screen==='classes'&&<Classes gymId={profile.gym_id} refresh={refresh} onBookMember={session=>open({type:'class_book',session})}/>} 
  {screen==='attendance'&&<Attendance gymId={profile.gym_id} refresh={refresh}/>}
+ {screen==='member-checkin'&&<MemberCheckInOut gymId={profile.gym_id} refresh={refresh} locked={false} onLock={enterKiosk} onUnlockRequest={requestUnlock}/>}
  {screen==='analytics'&&<Analytics gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='reports'&&<Reports gymId={profile.gym_id} refresh={refresh}/>}
  {screen==='whatsapp'&&<WhatsApp gymId={profile.gym_id} refresh={refresh} isAdmin={profile.role==='admin'}/>}
  {screen==='backup'&&<DataBackup gymId={profile.gym_id} isAdmin={profile.role==='admin'}/>}
  {screen==='notifications'&&<Notifications gymId={profile.gym_id} refresh={refresh}/>}
- {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh}/>}
+ {screen==='settings'&&<Settings gymId={profile.gym_id} refresh={refresh} isAdmin={profile.role==='admin'}/>}
  {screen==='staff'&&<Staff gymId={profile.gym_id} currentUser={profile}/>}</main>
- <nav className="mobile-nav"><button className={screen==='dashboard'?'selected':''} onClick={()=>setScreen('dashboard')}><Home size={18}/><span>Home</span></button><button className={screen==='members'?'selected':''} onClick={()=>setScreen('members')}><Users size={18}/><span>Members</span></button><button className={screen==='attendance'?'selected':''} onClick={()=>setScreen('attendance')}><Check size={18}/><span>Attend</span></button><button className={screen==='payments'?'selected':''} onClick={()=>setScreen('payments')}><WalletCards size={18}/><span>Payments</span></button><button className={more?'selected':''} onClick={()=>setMore(true)}><MoreHorizontal size={18}/><span>More</span></button></nav>{more&&<Sheet title="More" onClose={()=>setMore(false)}><div className="mobile-more-grid">{visibleNav.filter(n=>!['dashboard','members','attendance','payments'].includes(n.id)).map(n=>{const I=n.icon;return <button key={n.id} className="quick" onClick={()=>{setMore(false);setScreen(n.id)}}><span><I size={19}/></span><b>{n.label}</b></button>})}</div></Sheet>}
+ <nav className="mobile-nav"><button className={screen==='dashboard'?'selected':''} onClick={()=>setScreen('dashboard')}><Home size={18}/><span>Home</span></button><button className={screen==='members'?'selected':''} onClick={()=>setScreen('members')}><Users size={18}/><span>Members</span></button><button className={screen==='member-checkin'?'selected':''} onClick={()=>setScreen('member-checkin')}><UserCheck size={18}/><span>Check in</span></button><button className={screen==='payments'?'selected':''} onClick={()=>setScreen('payments')}><WalletCards size={18}/><span>Payments</span></button><button className={more?'selected':''} onClick={()=>setMore(true)}><MoreHorizontal size={18}/><span>More</span></button></nav>{more&&<Sheet title="More" onClose={()=>setMore(false)}><div className="mobile-more-grid">{visibleNav.filter(n=>!['dashboard','members','member-checkin','payments'].includes(n.id)).map(n=>{const I=n.icon;return <button key={n.id} className="quick" onClick={()=>{setMore(false);setScreen(n.id)}}><span><I size={19}/></span><b>{n.label}</b></button>})}</div></Sheet>}
  {modal?.type==='old'&&<OldMemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={()=>{close();bump();toast('Old member added')}}/>}
  {modal?.type==='add'&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} onClose={close} onSaved={(_,notice)=>{close();bump();toast(notice||'Member created')}}/>}
  {modal?.type==='convert_lead'&&modal.lead&&<MemberForm gymId={profile.gym_id} isAdmin={profile.role==='admin'} leadId={modal.lead.id} prefill={{name:modal.lead.name,phone:modal.lead.phone||'',email:modal.lead.email||'',packageId:modal.lead.interested_package_id||'',coach:modal.lead.assigned_to||'',notes:'Converted from CRM lead'}} onClose={close} onSaved={(_,notice)=>{close();bump();toast(notice||'Lead converted to member')}}/>}

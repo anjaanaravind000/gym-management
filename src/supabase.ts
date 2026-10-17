@@ -6,7 +6,15 @@ const key=(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||import.meta.env.VITE_S
 export const supabaseConfig={urlConfigured:Boolean(url),keyConfigured:Boolean(key)};
 const SESSION_KEY='gym_app_session';
 
-function storedToken(){try{return localStorage.getItem(SESSION_KEY)}catch{return null}}
+function storedToken(){
+ try{
+  const current=sessionStorage.getItem(SESSION_KEY);
+  if(current)return current;
+  const legacy=localStorage.getItem(SESSION_KEY);
+  if(legacy){sessionStorage.setItem(SESSION_KEY,legacy);localStorage.removeItem(SESSION_KEY);return legacy}
+ }catch{}
+ return null
+}
 
 function buildClient(token:string|null){
  if(!url||!key)return null;
@@ -16,7 +24,11 @@ function buildClient(token:string|null){
 export let supabase=buildClient(storedToken());
 
 export function setAppSession(token:string|null){
- try{if(token)localStorage.setItem(SESSION_KEY,token);else localStorage.removeItem(SESSION_KEY)}catch{}
+ try{
+  if(token)sessionStorage.setItem(SESSION_KEY,token);
+  else sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+ }catch{}
  supabase=buildClient(token);
 }
 
